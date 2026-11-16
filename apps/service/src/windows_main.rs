@@ -3,7 +3,7 @@ use ga_ipc::PIPE_NAME;
 use ga_platform_win::{SERVICE_PIPE_SDDL, create_secure_pipe, pipe_client_sid};
 use std::ffi::OsString;
 use std::future::Future;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::windows::named_pipe::NamedPipeServer;
@@ -94,7 +94,10 @@ async fn handle_client(engine: Arc<Engine>, mode: Mode, pipe: NamedPipeServer) {
         // Console mode serves only the user who started it.
         (Mode::Console(own), Some(sid)) if own.sid.as_deref() == Some(sid.as_str()) => (**own).clone(),
         (Mode::Service { data_root }, Some(sid)) => match UserContext::for_sid(&sid, data_root) {
-            Some(ctx) => ctx,
+            Some(ctx) => {
+                grant_user_folder(&ctx.data_dir, &sid);
+                ctx
+            }
             None => return,
         },
         // Unknown or different user: close without answering.
@@ -140,9 +143,10 @@ fn run_service() -> Result<(), BoxError> {
     };
     set(ServiceState::Running, ServiceControlAccept::STOP | ServiceControlAccept::SHUTDOWN)?;
 
-    let program_data = std::env::var_os("ProgramData").unwrap_or_else(|| r"C:\ProgramData".into());
-    let data_root = PathBuf::from(program_data).join("GuardianAngel");
-    let result = tokio::runtime::Runtime::new().map_err(BoxError::from).and_then(|rt| {
+    let data_root = service_data_root();
+    // Before the CA key is created or read: lock the folder down.
+    secure_data_root(&data_root);
+    let result =tokio::runtime::Runtime::new().map_err(BoxError::from).and_then(|rt| {
         rt.block_on(async {
             let engine = Engine::start(config(data_root.clone())).await;
             serve(engine, Mode::Service { data_root }, async {
@@ -156,6 +160,58 @@ fn run_service() -> Result<(), BoxError> {
     result
 }
 
+/// `C:\ProgramData\GuardianAngel`: the service's data, including the
+/// inspection certificate's private key.
+fn service_data_root() -> PathBuf {
+    let program_data = std::env::var_os("ProgramData").unwrap_or_else(|| r"C:\ProgramData".into());
+    PathBuf::from(program_data).join("GuardianAngel")
+}
+
+/// Runs a system tool without a console window and reports whether it succeeded.
+fn run_quiet(program: &str, args: &[&str]) -> bool {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::process::Command::new(program)
+        .args(args)
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .is_ok_and(|o| o.status.success())
+}
+
+/// Only SYSTEM and administrators may read the data folder (ProgramData is
+/// readable by every user by default, and it holds the CA key).
+fn secure_data_root(root: &Path) {
+    let _ = std::fs::create_dir_all(root);
+    let root = root.to_string_lossy();
+    run_quiet(
+        "icacls",
+        &[&root, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", "/T", "/Q"],
+    );
+}
+
+/// Lets one user read (not change) their own folder: their exported
+/// certificate. Everything else in it is written by the service.
+fn grant_user_folder(dir: &Path, sid: &str) {
+    static DONE: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<String>>> = std::sync::OnceLock::new();
+    let done = DONE.get_or_init(Default::default);
+    if !done.lock().map(|mut d| d.insert(sid.to_owned())).unwrap_or(false) {
+        return;
+    }
+    let _ = std::fs::create_dir_all(dir);
+    run_quiet("icacls", &[&dir.to_string_lossy(), "/grant", &format!("*{sid}:(OI)(CI)RX"), "/Q"]);
+}
+
+fn wait_until_stopped(service: &windows_service::service::Service) {
+    for _ in 0..40 {
+        match service.query_status() {
+            Ok(s) if s.current_state == ServiceState::Stopped => return,
+            Err(_) => return,
+            _ => std::thread::sleep(Duration::from_millis(250)),
+        }
+    }
+}
+
+/// Installs the service, or updates and restarts an existing install.
 fn install() -> Result<(), BoxError> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT | ServiceManagerAccess::CREATE_SERVICE)?;
     let info = ServiceInfo {
@@ -170,23 +226,54 @@ fn install() -> Result<(), BoxError> {
         account_name: None, // LocalSystem
         account_password: None,
     };
-    let service = manager.create_service(&info, ServiceAccess::CHANGE_CONFIG | ServiceAccess::START)?;
+    let access = ServiceAccess::CHANGE_CONFIG | ServiceAccess::START | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS;
+    let service = match manager.open_service(SERVICE_NAME, access) {
+        Ok(existing) => {
+            // Upgrade or repair: stop the old copy, point it at this exe.
+            let _ = existing.stop();
+            wait_until_stopped(&existing);
+            existing.change_config(&info)?;
+            existing
+        }
+        Err(_) => manager.create_service(&info, access)?,
+    };
     service.set_description(DESCRIPTION)?;
+    secure_data_root(&service_data_root());
     service.start::<&str>(&[])?;
     println!("Installed and started the {SERVICE_NAME} service.");
     Ok(())
 }
 
+/// Removes the service. First puts back every Windows setting Guardian Angel
+/// changed, for every user who used it (NFR-9: uninstall restores settings).
 fn uninstall() -> Result<(), BoxError> {
     let manager = ServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     let service = manager.open_service(
         SERVICE_NAME,
         ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE,
-    )?;
-    if service.query_status()?.current_state != ServiceState::Stopped {
+    );
+    if let Ok(service) = &service {
         let _ = service.stop();
+        wait_until_stopped(service);
     }
-    service.delete()?;
-    println!("Removed the {SERVICE_NAME} service.");
+
+    let users = service_data_root().join("users");
+    for entry in std::fs::read_dir(&users).into_iter().flatten().flatten() {
+        let sid = entry.file_name().to_string_lossy().into_owned();
+        let Ok(journal) = ga_blocker::settings::journal::Journal::open(&entry.path().join("changes")) else { continue };
+        let mut store = ga_blocker::settings::store::WindowsStore::for_user(&sid);
+        match ga_blocker::settings::undo_all(&mut store, &journal) {
+            Ok(done) if !done.is_empty() => println!("Restored {} setting change(s) for {sid}.", done.len()),
+            Ok(_) => {}
+            // A user who is signed out has no loaded registry hive; their
+            // changes stay recorded and are listed here.
+            Err(e) => println!("Could not restore settings for {sid}: {e}"),
+        }
+    }
+
+    if let Ok(service) = service {
+        service.delete()?;
+        println!("Removed the {SERVICE_NAME} service.");
+    }
     Ok(())
 }

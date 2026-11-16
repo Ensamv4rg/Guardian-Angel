@@ -1159,6 +1159,7 @@ name = "ga-desktop"
 version = "0.1.0"
 dependencies = [
  "ga-ipc",
+ "ga-platform-win",
  "serde_json",
  "tauri",
  "tauri-build",
@@ -1273,6 +1274,7 @@ dependencies = [
 name = "ga-service"
 version = "0.1.0"
 dependencies = [
+ "ga-blocker",
  "ga-engine",
  "ga-ipc",
  "ga-platform-win",

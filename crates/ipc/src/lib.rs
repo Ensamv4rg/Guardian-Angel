@@ -51,6 +51,8 @@ pub enum Request {
     ProxyEvents,
     /// The inspection certificate (PEM) so the user can choose to trust it.
     ProxyExportCa,
+    /// Programs running for the calling user, to pick for inspection.
+    RunningApps,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

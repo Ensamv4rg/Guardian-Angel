@@ -60,9 +60,18 @@ pub struct UserSlot {
     state: Mutex<UserState>,
 }
 
+/// What a running scan is doing, for the progress bar.
+#[derive(Debug, Clone, serde::Serialize)]
+struct ScanProgress {
+    percent: u32,
+    step: String,
+    detail: String,
+}
+
 #[derive(Default)]
 struct UserState {
     scanning: bool,
+    progress: Option<ScanProgress>,
     generated_unix: Option<i64>,
     cookies: Option<CookieReport>,
     extensions: Option<ExtensionScan>,
@@ -190,6 +199,7 @@ impl Engine {
                 let events: Vec<InspectedRequest> = lock(&self.proxy.events).iter().rev().cloned().collect();
                 Ok(json!(events))
             }
+            Request::RunningApps => Ok(self.running_apps(&slot.ctx)),
             Request::ProxyExportCa => {
                 let ca = self.proxy.ca.as_ref().ok_or("The inspection certificate is not available.")?;
                 let path = slot.ctx.data_dir.join("guardian-angel-inspection.pem");
@@ -226,6 +236,46 @@ impl Engine {
         })
     }
 
+    /// Programs running for this user (not other users, not Windows itself),
+    /// one entry per executable, for the "inspect an app" picker.
+    fn running_apps(&self, ctx: &UserContext) -> Value {
+        let windows_dir = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_owned()).to_lowercase();
+        /// Never offered: Guardian Angel itself and the web view hosting apps' UIs.
+        const HIDDEN: &[&str] = &["guardian-angel.exe", "guardian-service.exe", "guardian.exe", "msedgewebview2.exe"];
+        let mut apps: std::collections::BTreeMap<String, Value> = std::collections::BTreeMap::new();
+        for p in ga_platform_win::running_processes() {
+            let key = p.exe.to_lowercase();
+            if HIDDEN.contains(&key.as_str()) {
+                continue;
+            }
+            if let Some(existing) = apps.get_mut(&key) {
+                // Same program, another process: remember its ID too.
+                if let Some(pids) = existing["pids"].as_array_mut() {
+                    pids.push(json!(p.pid));
+                }
+                continue;
+            }
+            // Only processes we can open (the user's own); others return None.
+            let Some(path) = ga_platform_win::process_image_path(p.pid) else { continue };
+            if path.to_lowercase().starts_with(&windows_dir) {
+                continue;
+            }
+            if let Some(sid) = &ctx.sid
+                && ga_platform_win::process_user_sid(p.pid).as_deref() != Some(sid.as_str())
+            {
+                continue;
+            }
+            // Electron and Chromium apps accept a proxy on their command line.
+            let dir = Path::new(&path).parent();
+            let electron = dir.is_some_and(|d| d.join("resources").join("app.asar").is_file() || d.join("resources").join("app").is_dir());
+            let name = Path::new(&p.exe).file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_else(|| p.exe.clone());
+            apps.insert(key, json!({ "exe": p.exe, "name": name, "path": path, "electron": electron, "pids": [p.pid] }));
+        }
+        let mut list: Vec<Value> = apps.into_values().collect();
+        list.sort_by_key(|v| v["name"].as_str().unwrap_or("").to_lowercase());
+        json!(list)
+    }
+
     fn overview(&self, slot: &UserSlot) -> Value {
         let state = lock(&slot.state);
         let network = match &*lock(&self.network) {
@@ -235,6 +285,7 @@ impl Engine {
         let score = score::score(state.privacy.as_ref(), state.extensions.as_ref(), state.cookies.as_ref(), state.apps.as_ref());
         json!({
             "scanning": state.scanning,
+            "progress": state.progress,
             "generated_unix": state.generated_unix,
             "score": score,
             "unread_alerts": state.alerts.iter().filter(|a| !a.read).count(),
@@ -309,14 +360,16 @@ impl Engine {
         }
         let engine = self.clone();
         tokio::spawn(async move {
-            let (ctx, db) = (slot.ctx.clone(), engine.db.clone());
+            let (ctx, db, s) = (slot.ctx.clone(), engine.db.clone(), slot.clone());
             let quick = tokio::task::spawn_blocking(move || {
+                s.set_progress(1, "Reading browser cookies", "Chrome, Edge, Brave, Vivaldi, Opera and Firefox profiles");
                 let cookies = ga_scanners::browsers::scan_cookies_in(&ctx.browser_roots);
-                (
-                    ga_report::build_cookie_report(&cookies, &db),
-                    ga_scanners::extensions::scan_extensions_in(&ctx.browser_roots),
-                    ga_scanners::windows_privacy::scan_privacy_with(&ctx.registry()),
-                )
+                let cookies = ga_report::build_cookie_report(&cookies, &db);
+                s.set_progress(4, "Checking browser extensions", "Every browser profile on this account");
+                let extensions = ga_scanners::extensions::scan_extensions_in(&ctx.browser_roots);
+                s.set_progress(6, "Checking Windows privacy settings", "Diagnostics, advertising, location, typing and speech");
+                let privacy = ga_scanners::windows_privacy::scan_privacy_with(&ctx.registry());
+                (cookies, extensions, privacy)
             })
             .await;
             if let Ok((cookies, extensions, privacy)) = quick {
@@ -338,9 +391,26 @@ impl Engine {
             }
 
             if engine.config.app_scan {
-                let (ctx, matcher) = (slot.ctx.clone(), engine.matcher.clone());
+                let (ctx, matcher, s) = (slot.ctx.clone(), engine.matcher.clone(), slot.clone());
                 let apps = tokio::task::spawn_blocking(move || {
-                    ga_scanners::apps::scan_apps_with(&ctx.registry(), &ctx.app_roots, &matcher, Limits::default())
+                    const STEP: &str = "Looking inside installed apps";
+                    s.set_progress(8, STEP, "Finding installed apps");
+                    ga_scanners::apps::scan_apps_with_progress(
+                        &ctx.registry(),
+                        &ctx.app_roots,
+                        &matcher,
+                        Limits::default(),
+                        &|done, total, name| {
+                            // Apps take most of the time: 8% to 99%.
+                            let percent = 8 + (done * 91).checked_div(total).unwrap_or(0) as u32;
+                            let detail = if name.is_empty() {
+                                format!("{total} apps found")
+                            } else {
+                                format!("{name} ({done} of {total} done)")
+                            };
+                            s.set_progress(percent, STEP, &detail);
+                        },
+                    )
                 })
                 .await;
                 if let Ok(apps) = apps {
@@ -354,9 +424,21 @@ impl Engine {
                     state.apps = Some(apps);
                 }
             }
-            lock(&slot.state).scanning = false;
+            let mut state = lock(&slot.state);
+            state.scanning = false;
+            state.progress = None;
         });
         true
+    }
+}
+
+impl UserSlot {
+    fn set_progress(&self, percent: u32, step: &str, detail: &str) {
+        lock(&self.state).progress = Some(ScanProgress {
+            percent,
+            step: step.to_owned(),
+            detail: detail.to_owned(),
+        });
     }
 }
 

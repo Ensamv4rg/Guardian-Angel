@@ -21,6 +21,18 @@ export async function call<T = unknown>(method: string, params?: unknown): Promi
   throw new Error("Open Guardian Angel from the desktop app.");
 }
 
+/** Whether desktop-only actions (certificate, launching apps) are available. */
+export const isDesktopApp = inTauri;
+
+/**
+ * Calls a command of the desktop app itself (runs as the signed-in user,
+ * not through the service): certificate trust and launching apps.
+ */
+export async function native<T = unknown>(command: string, args?: Record<string, unknown>): Promise<T> {
+  if (!inTauri) throw new Error("This works in the Guardian Angel desktop app.");
+  return invoke<T>(command, args);
+}
+
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }

@@ -117,3 +117,18 @@ fn size_limit_marks_scan_as_truncated() {
     assert!(scan.apps.iter().any(|a| a.truncated));
     assert!(scan.apps.iter().all(|a| a.bytes_scanned <= 10));
 }
+
+#[test]
+fn reports_progress_for_every_app() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (reg, roots) = setup(tmp.path());
+    let matcher = Matcher::bundled(&TrackerDb::bundled().unwrap());
+    let calls = std::sync::Mutex::new(Vec::new());
+    scan_apps_with_progress(&reg, &roots, &matcher, Limits::default(), &|done, total, name| {
+        calls.lock().unwrap().push((done, total, name.to_owned()));
+    });
+    let calls = calls.into_inner().unwrap();
+    assert_eq!(calls.first(), Some(&(0, 3, String::new())), "first call announces the total");
+    assert!(calls.iter().any(|(d, t, _)| d == t), "a final call reports all done");
+    assert!(calls.iter().any(|(_, _, n)| n == "Chatty"), "names the app being scanned");
+}

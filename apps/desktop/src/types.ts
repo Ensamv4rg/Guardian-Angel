@@ -12,6 +12,12 @@ export interface CompanyExposure {
   browsers: string[];
 }
 export interface ScanWarning { browser: string; profile: string; message: string }
+export type CookiePurpose = "tracking" | "login" | "security" | "preferences" | "consent" | "unknown";
+export interface OtherCookies {
+  by_purpose: { purpose: CookiePurpose; count: number }[];
+  hidden_trackers: { tool: string; cookies: number; sites: number; examples: string[] }[];
+  top_sites: { site: string; count: number; purposes: CookiePurpose[] }[];
+}
 export interface CookieReport {
   profiles_scanned: number;
   total_cookies: number;
@@ -19,8 +25,12 @@ export interface CookieReport {
   companies: CompanyExposure[];
   unclassified_cookies: number;
   unclassified_domains: number;
+  other: OtherCookies;
   warnings: ScanWarning[];
 }
+
+export interface ScanProgress { percent: number; step: string; detail: string }
+export interface RunningApp { exe: string; name: string; path: string; electron: boolean; pids: number[] }
 
 export interface SensitivePermission { permission: string; meaning: string }
 export interface BrowserExtension {
@@ -86,6 +96,7 @@ export interface NetworkReport {
 
 export interface Overview {
   scanning: boolean;
+  progress: ScanProgress | null;
   generated_unix: number | null;
   score: Score;
   unread_alerts: number;

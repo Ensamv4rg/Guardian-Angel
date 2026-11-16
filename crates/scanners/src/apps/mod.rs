@@ -31,8 +31,22 @@ pub fn scan_apps(db: &TrackerDb) -> AppScan {
 }
 
 pub fn scan_apps_with(reg: &dyn Registry, roots: &AppRoots, matcher: &Matcher, limits: Limits) -> AppScan {
+    scan_apps_with_progress(reg, roots, matcher, limits, &|_, _, _| {})
+}
+
+/// Reports progress as (apps finished, apps in total, app being scanned).
+pub type Progress<'a> = &'a (dyn Fn(usize, usize, &str) + Sync);
+
+pub fn scan_apps_with_progress(
+    reg: &dyn Registry,
+    roots: &AppRoots,
+    matcher: &Matcher,
+    limits: Limits,
+    progress: Progress<'_>,
+) -> AppScan {
     let candidates = inventory::discover(reg, roots);
-    let mut apps = merge_same_name(inspect_parallel(&candidates, matcher, limits));
+    progress(0, candidates.len(), "");
+    let mut apps = merge_same_name(inspect_parallel(&candidates, matcher, limits, progress));
     // Apps with the most certain findings first.
     apps.sort_by(|a, b| {
         let score = |x: &ga_core::InstalledApp| {
@@ -81,8 +95,14 @@ fn merge_same_name(apps: Vec<ga_core::InstalledApp>) -> Vec<ga_core::InstalledAp
 /// so a few threads help without loading the machine.
 const PARALLEL_APPS: usize = 4;
 
-fn inspect_parallel(candidates: &[Candidate], matcher: &Matcher, limits: Limits) -> Vec<ga_core::InstalledApp> {
+fn inspect_parallel(
+    candidates: &[Candidate],
+    matcher: &Matcher,
+    limits: Limits,
+    progress: Progress<'_>,
+) -> Vec<ga_core::InstalledApp> {
     let next = std::sync::atomic::AtomicUsize::new(0);
+    let finished = std::sync::atomic::AtomicUsize::new(0);
     let results = std::sync::Mutex::new(Vec::with_capacity(candidates.len()));
     std::thread::scope(|s| {
         for _ in 0..PARALLEL_APPS.min(candidates.len().max(1)) {
@@ -90,8 +110,11 @@ fn inspect_parallel(candidates: &[Candidate], matcher: &Matcher, limits: Limits)
                 loop {
                     let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     let Some(c) = candidates.get(i) else { break };
+                    progress(finished.load(std::sync::atomic::Ordering::Relaxed), candidates.len(), &c.name);
                     let app = inspect::inspect(c, matcher, limits);
                     results.lock().unwrap_or_else(|p| p.into_inner()).push(app);
+                    let done = finished.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+                    progress(done, candidates.len(), &c.name);
                 }
             });
         }

@@ -20,6 +20,19 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
+    "publisher": "Guardian Angel",
+    "category": "Utility",
+    "shortDescription": "See and stop who is tracking you on this PC",
+    "longDescription": "Guardian Angel finds trackers, telemetry and spyware on this computer, explains them in plain language, and blocks or fixes them when you choose.",
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"],
+    "externalBin": ["binaries/guardian-service"],
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "installerHooks": "./windows/hooks.nsh",
+        "displayLanguageSelector": false
+      }
+    }
   }
 }

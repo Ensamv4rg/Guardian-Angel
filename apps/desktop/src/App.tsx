@@ -1,5 +1,6 @@
 import { type ReactElement, useCallback, useEffect, useState } from "react";
 import { call, errorText } from "./api";
+import { ScanProgressBar } from "./components";
 import type { Overview } from "./types";
 import logo from "../src-tauri/icons/128x128.png";
 import OverviewPage from "./pages/Overview";
@@ -43,7 +44,7 @@ export default function App() {
   useEffect(() => {
     refresh();
     const scanning = overview?.scanning ?? true;
-    const id = setInterval(refresh, scanning ? 3000 : 30000);
+    const id = setInterval(refresh, scanning ? 1500 : 30000);
     return () => clearInterval(id);
   }, [refresh, overview?.scanning]);
 
@@ -53,7 +54,7 @@ export default function App() {
     trackers: <TrackersPage {...props} />,
     apps: <AppsPage {...props} />,
     network: <NetworkPage {...props} />,
-    inspect: <InspectPage {...props} />,
+    inspect: <InspectPage />,
     extensions: <ExtensionsPage {...props} />,
     settings: <SettingsPage {...props} />,
     alerts: <AlertsPage {...props} />,
@@ -85,6 +86,7 @@ export default function App() {
             {error} Start it with <span className="mono">guardian-service console</span> (development) or install the service.
           </div>
         )}
+        {overview?.progress && <ScanProgressBar progress={overview.progress} />}
         {pages[page]}
       </main>
     </div>

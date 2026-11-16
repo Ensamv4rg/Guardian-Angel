@@ -1,107 +1,147 @@
 # Guardian Angel
 
-See who is collecting data from your computer, explained by company, with one-click fixes.
+Guardian Angel shows who is collecting data from your Windows PC, explains it in plain language, and lets you block or fix it with one click. Everything is analysed on your computer; nothing is sent anywhere.
 
-Design proposal: https://claude.ai/artifact/PRVZ8nW3mQiCMLxHzkce4j
+## What it does
 
-## Status
+| Area | What you see |
+| --- | --- |
+| **Overview** | A privacy score out of 100, with the reasons it is not 100, and live scan progress |
+| **Trackers** | Companies with cookies in your browsers, plus what every other cookie is for, including tracking tools hiding under websites' own names |
+| **Apps** | Tracking and telemetry SDKs built into your desktop apps (Sentry, App Center, Mixpanel, Segment, Firebase and more) |
+| **Network** | Which programs contact which tracking companies, live |
+| **Inspect traffic** | Exactly what an app you pick sends to trackers, decoded into plain language |
+| **Extensions** | Browser extensions and what each one can read |
+| **Windows settings** | Settings that share your data, with a fix button and undo for each |
+| **Alerts** | What got worse since the last scan: a new risky extension, a setting switched back on, a new SDK in an app |
 
-Early development. Working today:
+Guardian Angel never changes anything without you asking, and every change can be undone. Uninstalling puts back every setting it changed.
 
-- Browser cookie scanner for Chrome, Edge, Brave, Vivaldi, Opera, Opera GX and Firefox (domains and names only; values are never read)
-- Desktop app SDK scanner: finds tracking and telemetry SDKs (Sentry, App Center, Application Insights, Mixpanel, Amplitude, Segment, Firebase and more) in installed apps, including inside Electron `app.asar` archives; "sure" when the SDK is bundled, "mentions" when only its address is in the code
-- Decrypting HTTPS proxy, opt-in per app: decodes tracker payloads from desktop apps, tunnels everything else untouched, learns which apps refuse inspection (certificate pinning) and stops trying, passes WebSockets through, and serves a revocation list so Windows' own TLS accepts its certificates
-- Privacy fixes with undo: every change is recorded in a journal before it is made, rolled back if any step fails, and undo leaves alone any value you changed since (`guardian fix`, `guardian undo`)
-- Background service (`guardian-service`): runs the scans per Windows user, raises alerts when something gets worse, runs the network monitor and hosts the proxy. Clients talk to it over a named pipe that only signed-in local users can open, and each user only ever sees their own data
-- Desktop app (Tauri 2 + React): overview with a privacy score, trackers, apps, network, traffic inspection, extensions, Windows settings with fix and undo, and alerts
-- Blocking DNS resolver (Relaxed / Balanced / Strict profiles, user allow and block lists, pause, protected Windows Update and certificate domains). Forwards to the DNS servers Windows already uses. Not yet connected to Windows' DNS settings.
-- Tracker payload decoders (Google Analytics 4 and Universal Analytics, Meta Pixel, Bing UET, LinkedIn Insight, Segment, TikTok Pixel) and `decode-har` to see what trackers received on a page
-- Live network monitor: which programs look up which domains, grouped by tracking company (Windows DNS client ETW events; no admin needed if the account is in Performance Log Users)
-- Browser extension scanner for Chromium browsers and Firefox: granted site access, sensitive permissions, install source, risk level
-- Windows privacy settings scanner (diagnostic data, advertising ID, location, typing and speech, app tracking, suggested apps), read-only
-- History of which apps used the camera, microphone or location
-- Seed tracker list (~50 companies) in `data/sources/seed_trackers.json`
-- Report grouped by company
-- `guardian` command-line tool for development
+## Install
 
-## Known gaps before release
+Run `Guardian Angel_<version>_x64-setup.exe` and accept the Windows prompt. The installer:
 
-- The service is not yet tested installed as SYSTEM; console mode is. It serves each connecting user from their own profile folder and `HKEY_USERS\<SID>` hive. The network monitor and proxy are machine-wide (program names only; proxy app choices are shared).
-- The service does not yet point Windows at the DNS resolver or the proxy, or install the inspection certificate: each needs a consent flow with automatic rollback.
-- Tested on Windows 10 22H2 only. Needs a test matrix: Windows 11, clean installs, Home / Pro / Enterprise.
-- Windows 11-only settings (e.g. Recall) are not checked yet.
-- Network monitor sees only lookups that go through the Windows DNS client. Browsers using DNS-over-HTTPS (Secure DNS) bypass it; the planned local DNS resolver closes this gap. Bytes per process (Kernel-Network ETW) are not collected yet.
-- The DNS resolver handles UDP only; large replies that need TCP fall back badly. Port 53 is already taken on some PCs (e.g. by Internet Connection Sharing), so the service needs a strategy for that before Windows can be pointed at the resolver.
-- The proxy only works for apps that send traffic through it: today, apps started with a proxy flag. Setting the Windows proxy and trusting the certificate (with the user's consent and automatic rollback) belong to the service. It refuses plain-HTTP proxy requests, speaks HTTP/1.1 only towards apps, does not decode compressed request bodies yet, and keeps its CA key in the user profile without DPAPI encryption yet.
-- The app SDK scanner reads up to 64 MB of code per app; a first full scan takes about 1.5 minutes here, mostly waiting on antivirus. The service should cache results per file and rescan only what changed. Store (MSIX) apps are not scanned.
-- Decoders cover 7 trackers. Session-recording tools (Hotjar, Clarity) send compressed or WebSocket data and are reported as "cannot be decoded yet".
-- Without admin rights, Windows services show as `PID 1234` instead of a program name, and very short-lived programs may too.
-- Activity history is not reported: only its Group Policy values are reliably readable.
+- installs the app and its background service, which starts with Windows
+- opens Guardian Angel when it finishes
 
-## Requirements
+To remove it, use **Settings > Apps > Guardian Angel > Uninstall**. This restores the Windows settings Guardian Angel changed, removes its inspection certificate if you allowed one, and deletes its data.
 
-- Windows 10 22H2 or Windows 11
-- Rust stable with the MSVC toolchain (pinned by `rust-toolchain.toml`)
-- Visual Studio Build Tools with the C++ workload
+Requirements: Windows 10 (22H2) or Windows 11, 64-bit.
 
-## Run
+## How it works
+
+```
+ Desktop app (Tauri + React)          Browser extension (planned)
+            |  named pipe, signed-in local users only
+            v
+ Background service (Rust, runs as SYSTEM)
+   scanners: cookies, extensions, settings, app SDKs
+   network monitor (Windows DNS events)    inspection proxy (opt-in, per app)
+   blocking DNS resolver (not yet active)  settings fixes with an undo journal
+```
+
+- The service answers each request for the Windows user who asked, from that user's own profile and registry, so one user never sees another's data.
+- The desktop app has no privileges of its own. It only talks to the service, plus two actions that belong to you: trusting the inspection certificate (Windows asks you to confirm) and restarting an app with inspection on.
+- Only `crates/platform-win` may use `unsafe` Rust; every block there carries a `SAFETY:` comment. The rest of the workspace forbids it.
+
+## Development
+
+### Prerequisites
+
+- Rust stable with the MSVC toolchain (pinned by `rust-toolchain.toml`) and Visual Studio Build Tools with the C++ workload
+- Node.js 22 and pnpm
+
+### Run from source
+
+Start the engine in a terminal and leave it open:
+
+```
+cargo run --release -p ga-service -- console
+```
+
+Then the desktop app, with live reload:
+
+```
+.\scripts\build-installer.ps1 -SidecarOnly
+cd apps\desktop
+pnpm install
+pnpm tauri dev
+```
+
+`-SidecarOnly` copies the service where Tauri expects it; it is needed once, and again after changing the service. For interface work in a normal browser, `pnpm dev` alone serves the UI at http://localhost:1420 and relays to the running engine.
+
+### Build the installer
+
+```
+.\scripts\build-installer.ps1
+```
+
+The installer is written to `target\release\bundle\nsis\`. The first build downloads Tauri's NSIS tools and takes about 15 minutes.
+
+Always build the desktop app with `pnpm tauri build`, never `cargo build`: only Tauri's build embeds the interface (a plain cargo build points the app at `localhost:1420`). Keep the `tauri` crate and the `@tauri-apps/*` npm packages on the same minor version (2.11), or the build refuses to run.
+
+### Test
 
 ```
 cargo test --workspace
-cargo run -p ga-cli -- cookies
-cargo run -p ga-cli -- cookies --json
-cargo run -p ga-cli -- extensions
-cargo run -p ga-cli -- privacy
-cargo run -p ga-cli -- network --seconds 60
-cargo run -p ga-cli -- dns --port 15353 --profile balanced --seconds 60
-cargo run -p ga-cli -- decode-har page.har
-cargo run -p ga-cli -- apps
-cargo run -p ga-cli -- proxy --export-ca guardian-ca.pem
-cargo run -p ga-cli -- proxy --inspect Discord.exe --seconds 120
-cargo run -p ga-cli -- fix --all            # shows the plan; add --apply to change settings
-cargo run -p ga-cli -- undo                 # lists changes; `undo <id>` or `undo --all`
+cargo clippy --workspace --all-targets
+cd apps\desktop && npx tsc -p .
 ```
 
-Service and desktop app:
+Tests never change your system. One registry test writes to a scratch key and is ignored unless run with `--ignored`.
 
-```
-cargo run --release -p ga-service -- console     # the engine, as the current user
-cargo run -p ga-cli -- service status            # talk to it over the pipe
-cd apps/desktop && pnpm install && pnpm tauri dev
-```
+### Command-line tool
 
-To build the desktop app, use Tauri's build command, not `cargo build`: only `tauri build` embeds the interface in the exe (a plain cargo build points the app at the dev server, `localhost:1420`).
+`guardian` (in `apps/cli`) runs each part on its own, which helps when developing a scanner:
 
-```
-cd apps/desktop && pnpm tauri build --no-bundle   # target/release/guardian-angel.exe
-```
+| Command | What it does |
+| --- | --- |
+| `guardian cookies` | Browser cookies by company (close browsers first; they lock their cookie files) |
+| `guardian extensions` | Browser extensions and their risk |
+| `guardian privacy` | Windows privacy settings and camera, microphone and location use |
+| `guardian apps` | SDKs in installed apps |
+| `guardian network --seconds 60` | Live DNS lookups by program and company |
+| `guardian fix --all` | Shows what would change; add `--apply` to change settings |
+| `guardian undo` | Lists changes; `undo <id>` or `undo --all` reverses them |
+| `guardian proxy --inspect Discord.exe` | Runs the inspection proxy for one app |
+| `guardian dns --port 15353` | Runs the blocking DNS resolver on a test port |
+| `guardian decode-har page.har` | Decodes tracker requests in a browser network export |
+| `guardian service status` | Sends one request to the running engine |
 
-The Tauri crate (`tauri` 2.11) and the npm packages (`@tauri-apps/api` 2.11, `@tauri-apps/cli` 2.11) must stay on the same minor version, or `tauri build` refuses to run.
+Add `--json` to most commands for machine-readable output.
 
-`guardian-service install` (administrator) registers it as a Windows service running as SYSTEM. For UI work in a browser, `pnpm dev` alone serves the UI at http://localhost:1420 and relays to the running service through `target/release/guardian.exe`.
-cargo run -p ga-cli -- privacy --all-apps
-```
-
-Close Chrome and Edge first: they lock their cookie databases while running.
-
-## Layout
+### Repository layout
 
 | Path | What it is |
 | --- | --- |
-| `crates/core` | Shared types |
-| `crates/knowledge` | Tracker knowledge base (domain to company) |
-| `crates/scanners` | Local scanners: cookies, extensions, privacy settings, app SDKs |
-| `crates/report` | Company-centric report builder |
-| `crates/netmon` | Live network monitoring (ETW) |
-| `crates/blocker` | Blocking DNS resolver and blocking policy |
-| `crates/decoders` | Tracker payload decoders and HAR reader |
-| `crates/ipc` | Pipe protocol between the service and its clients |
+| `apps/desktop` | Desktop app: Tauri shell (`src-tauri`), React UI (`src`), installer hooks (`src-tauri/windows`) |
+| `apps/service` | `guardian-service`: the Windows service, plus `console`, `install` and `uninstall` |
+| `apps/cli` | `guardian` command-line tool |
 | `crates/engine` | Per-user scans, alerts, score, network monitor and proxy behind the protocol |
-| `apps/service` | `guardian-service`: Windows service and console mode |
-| `apps/desktop` | Desktop app: Tauri 2 shell (`src-tauri`) and React UI (`src`) |
+| `crates/ipc` | Pipe protocol between the service and its clients |
+| `crates/scanners` | Cookies, extensions, privacy settings, app SDKs |
+| `crates/report` | Reports by company, cookie purposes |
+| `crates/netmon` | Live network monitoring from Windows DNS events |
+| `crates/blocker` | Blocking DNS resolver and settings fixes with undo |
 | `crates/proxy` | Opt-in decrypting HTTPS proxy and its per-install certificate authority |
-| `crates/platform-win` | The only crate allowed `unsafe`: thin Windows API wrappers |
-| `apps/cli` | `guardian` development CLI |
+| `crates/decoders` | Tracker payload decoders and HAR reader |
+| `crates/knowledge` | Tracker list: domain to company |
+| `crates/core` | Shared types |
+| `crates/platform-win` | Thin Windows API wrappers; the only crate allowed `unsafe` |
 | `data/sources` | Tracker list and SDK signature catalog |
+| `scripts` | Installer build script |
 
-Only `platform-win` may use `unsafe`, and every block there needs a `SAFETY:` comment; the workspace forbids `unsafe` everywhere else.
+## Known gaps
+
+- **Not yet on:** blocking (the DNS resolver works but Windows is not pointed at it) and inspecting apps that do not take a proxy flag (needs the Windows proxy setting). Both need a consent step with automatic rollback.
+- **Code signing:** the installer and app are not signed yet, so Windows SmartScreen warns on first run.
+- **Testing:** tested on Windows 10 22H2. Needs Windows 11 and Home / Pro / Enterprise runs, and the installed service needs a full test as SYSTEM.
+- **Network monitor:** sees lookups through the Windows DNS client only; browsers using Secure DNS bypass it. Data volumes per program are not measured yet.
+- **App scan:** reads up to 64 MB of code per app; the first scan takes about 1.5 minutes. Results are not cached per file yet. Store (MSIX) apps are not scanned.
+- **Proxy:** HTTP/1.1 towards apps only, no plain-HTTP proxying, compressed request bodies are not decoded, and the CA key is protected by folder permissions but not yet encrypted.
+- **Decoders:** 7 trackers. Session-recording tools (Hotjar, Clarity) are listed but not decoded.
+- **DNS resolver:** UDP only. Port 53 is taken on some PCs (for example by Internet Connection Sharing).
+- **Settings:** Windows 11-only settings (Recall) and activity history are not checked yet.
+- **Tracker list:** a hand-curated seed list of about 50 companies; importing DuckDuckGo Tracker Radar needs a licence check first.
+
+Design proposal and roadmap: https://claude.ai/artifact/PRVZ8nW3mQiCMLxHzkce4j

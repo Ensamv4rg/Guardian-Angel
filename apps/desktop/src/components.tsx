@@ -53,6 +53,33 @@ export function Bar({ value, max }: { value: number; max: number }) {
   );
 }
 
+/** A small "i" that shows an explanation on hover or keyboard focus. */
+export function Tip({ text }: { text: string }) {
+  return (
+    <span className="tip" tabIndex={0} role="note" aria-label={text}>
+      i<span className="tip-text">{text}</span>
+    </span>
+  );
+}
+
+/** Scan progress: overall percentage, the current step and what it is reading. */
+export function ScanProgressBar({ progress }: { progress: { percent: number; step: string; detail: string } }) {
+  return (
+    <div className="progress" role="progressbar" aria-valuenow={progress.percent} aria-valuemin={0} aria-valuemax={100}>
+      <div className="row small">
+        <span className="spinner" />
+        <b>{progress.step}</b>
+        <span className="muted">{progress.detail}</span>
+        <span className="spacer" />
+        <b>{progress.percent}%</b>
+      </div>
+      <div className="bar" style={{ marginTop: 6 }}>
+        <span style={{ width: `${Math.max(2, progress.percent)}%`, transition: "width 0.4s" }} />
+      </div>
+    </div>
+  );
+}
+
 export function Empty({ children }: { children: ReactNode }) {
   return <div className="empty">{children}</div>;
 }

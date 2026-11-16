@@ -1,4 +1,4 @@
-[package]
+﻿[package]
 name = "ga-service"
 description = "Guardian Angel background service (and console mode for development)"
 version.workspace = true
@@ -12,6 +12,7 @@ name = "guardian-service"
 path = "src/main.rs"
 
 [dependencies]
+ga-blocker.workspace = true
 ga-engine.workspace = true
 ga-ipc.workspace = true
 tokio.workspace = true

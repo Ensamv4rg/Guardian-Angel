@@ -118,3 +118,16 @@ async fn status_reports_components() {
     assert_eq!(st["network"]["state"], "off");
     assert_eq!(st["users"], 1);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn running_apps_lists_own_programs_but_not_windows() {
+    let s = setup().await;
+    let apps = call(&s, Request::RunningApps).await.unwrap();
+    let apps = apps.as_array().unwrap();
+    // The test binary itself is one of this user's programs.
+    let me = std::env::current_exe().unwrap();
+    let me = me.file_name().unwrap().to_string_lossy().to_lowercase();
+    assert!(apps.iter().any(|a| a["exe"].as_str().unwrap().to_lowercase() == me), "{apps:?}");
+    let windows = std::env::var("SystemRoot").unwrap().to_lowercase();
+    assert!(apps.iter().all(|a| !a["path"].as_str().unwrap().to_lowercase().starts_with(&windows)));
+}

@@ -1,5 +1,9 @@
 //! Turns raw scan results into a report grouped by company (requirement FR-6).
 
+mod purpose;
+
+pub use purpose::{CookiePurpose, identify as cookie_purpose};
+
 use ga_core::{Browser, Category, CookieScan, NetworkCapture, ScanWarning};
 use ga_knowledge::TrackerDb;
 use serde::Serialize;
@@ -35,7 +39,92 @@ pub struct CookieReport {
     pub unclassified_cookies: usize,
     pub unclassified_domains: usize,
     pub top_unclassified: Vec<DomainCount>,
+    /// What the cookies outside the tracker list are for.
+    pub other: OtherCookies,
     pub warnings: Vec<ScanWarning>,
+}
+
+/// Cookies on sites that are not on the tracker list, explained by name.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct OtherCookies {
+    /// Largest first.
+    pub by_purpose: Vec<PurposeCount>,
+    /// Tracking tools found under sites' own domains, most sites first.
+    pub hidden_trackers: Vec<HiddenTracker>,
+    /// Sites with the most of these cookies.
+    pub top_sites: Vec<SiteCookies>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PurposeCount {
+    pub purpose: CookiePurpose,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct HiddenTracker {
+    pub tool: String,
+    pub cookies: usize,
+    /// Number of different sites it was found on.
+    pub sites: usize,
+    /// A few example sites.
+    pub examples: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SiteCookies {
+    pub site: String,
+    pub count: usize,
+    pub purposes: BTreeSet<CookiePurpose>,
+}
+
+const TOP_SITES: usize = 15;
+const EXAMPLE_SITES: usize = 4;
+
+fn explain_other(scan: &CookieScan, db: &TrackerDb) -> OtherCookies {
+    let mut by_purpose: HashMap<CookiePurpose, usize> = HashMap::new();
+    let mut hidden: HashMap<&'static str, (usize, BTreeSet<String>)> = HashMap::new();
+    let mut sites: HashMap<String, (usize, BTreeSet<CookiePurpose>)> = HashMap::new();
+    for cookie in scan.cookies.iter().filter(|c| db.classify(&c.host).is_none()) {
+        let (purpose, tool) = purpose::identify(&cookie.name);
+        *by_purpose.entry(purpose).or_default() += 1;
+        let site = cookie.host.strip_prefix("www.").unwrap_or(&cookie.host).to_owned();
+        if let Some(tool) = tool {
+            let entry = hidden.entry(tool).or_default();
+            entry.0 += 1;
+            entry.1.insert(site.clone());
+        }
+        let entry = sites.entry(site).or_default();
+        entry.0 += 1;
+        entry.1.insert(purpose);
+    }
+
+    let mut by_purpose: Vec<PurposeCount> = by_purpose.into_iter().map(|(purpose, count)| PurposeCount { purpose, count }).collect();
+    by_purpose.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.purpose.cmp(&b.purpose)));
+
+    let mut hidden_trackers: Vec<HiddenTracker> = hidden
+        .into_iter()
+        .map(|(tool, (cookies, site_set))| HiddenTracker {
+            tool: tool.to_owned(),
+            cookies,
+            sites: site_set.len(),
+            examples: site_set.into_iter().take(EXAMPLE_SITES).collect(),
+        })
+        .collect();
+    hidden_trackers.sort_by(|a, b| b.sites.cmp(&a.sites).then_with(|| a.tool.cmp(&b.tool)));
+
+    let mut top_sites: Vec<SiteCookies> = sites
+        .into_iter()
+        .map(|(site, (count, purposes))| SiteCookies { site, count, purposes })
+        .collect();
+    top_sites.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.site.cmp(&b.site)));
+    top_sites.truncate(TOP_SITES);
+
+    OtherCookies {
+        by_purpose,
+        hidden_trackers,
+        top_sites,
+    }
 }
 
 pub fn build_cookie_report(scan: &CookieScan, db: &TrackerDb) -> CookieReport {
@@ -82,6 +171,7 @@ pub fn build_cookie_report(scan: &CookieScan, db: &TrackerDb) -> CookieReport {
         unclassified_cookies,
         unclassified_domains,
         top_unclassified: top,
+        other: explain_other(scan, db),
         warnings: scan.warnings.clone(),
     }
 }
@@ -291,6 +381,49 @@ mod tests {
         assert_eq!(report.unclassified_cookies, 3);
         assert_eq!(report.unclassified_domains, 2);
         assert_eq!(report.top_unclassified[0].domain, "example.com");
+        // The other cookies are explained by name.
+        assert_eq!(report.other.by_purpose.iter().map(|p| p.count).sum::<usize>(), 3);
         assert_eq!(report.top_unclassified[0].count, 2);
+    }
+}
+
+#[cfg(test)]
+mod other_cookie_tests {
+    use super::*;
+    use ga_core::CookieRecord;
+
+    fn cookie(host: &str, name: &str) -> CookieRecord {
+        CookieRecord {
+            browser: Browser::Chrome,
+            profile: "Default".into(),
+            host: host.into(),
+            name: name.into(),
+            last_access_unix: None,
+        }
+    }
+
+    #[test]
+    fn finds_trackers_hiding_under_site_domains() {
+        let scan = CookieScan {
+            cookies: vec![
+                cookie("www.shop.example", "_ga"),
+                cookie("shop.example", "_ga_XYZ"),
+                cookie("news.example", "_ga"),
+                cookie("news.example", "_fbp"),
+                cookie("news.example", "PHPSESSID"),
+                cookie("bank.example", "__cf_bm"),
+                // On the tracker list: counted as a company, not here.
+                cookie("doubleclick.net", "IDE"),
+            ],
+            warnings: vec![],
+            profiles_scanned: 1,
+        };
+        let r = build_cookie_report(&scan, &TrackerDb::bundled().unwrap());
+        let ga = &r.other.hidden_trackers[0];
+        assert_eq!((ga.tool.as_str(), ga.sites, ga.cookies), ("Google Analytics", 2, 3));
+        assert_eq!(r.other.by_purpose[0], PurposeCount { purpose: CookiePurpose::Tracking, count: 4 });
+        assert_eq!(r.other.top_sites[0].site, "news.example");
+        assert!(r.other.top_sites[0].purposes.contains(&CookiePurpose::Login));
+        assert_eq!(r.companies.len(), 1);
     }
 }
