@@ -5,6 +5,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use ga_core::{AppAccess, Exposure, PrivacyScan};
 use ga_knowledge::TrackerDb;
 use ga_report::{CookieReport, build_cookie_report};
 use std::collections::BTreeSet;
@@ -28,6 +29,16 @@ enum Command {
         #[arg(long, default_value_t = 25)]
         top: usize,
     },
+    /// Check Windows privacy settings and which apps used your camera,
+    /// microphone or location.
+    Privacy {
+        /// Print the full result as JSON instead of text.
+        #[arg(long)]
+        json: bool,
+        /// List every app with recorded use, not just the 20 most recent.
+        #[arg(long)]
+        all_apps: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -43,8 +54,134 @@ fn main() -> Result<()> {
                 print_report(&report, top);
             }
         }
+        Command::Privacy { json, all_apps } => {
+            let scan = ga_scanners::windows_privacy::scan_privacy();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&scan)?);
+            } else {
+                print_privacy(&scan, all_apps);
+            }
+        }
     }
     Ok(())
+}
+
+/// How many recently used apps to list without `--all-apps`.
+const RECENT_APPS: usize = 20;
+
+fn print_privacy(scan: &PrivacyScan, all_apps: bool) {
+    let count = |e: Exposure| scan.settings.iter().filter(|s| s.exposure == e).count();
+    println!("Guardian Angel - Windows privacy settings");
+    println!(
+        "{} settings share your data, {} protect you, {} could not be determined.",
+        count(Exposure::Exposed),
+        count(Exposure::Protected),
+        count(Exposure::Unknown)
+    );
+
+    for (exposure, heading, mark) in [
+        (Exposure::Exposed, "Sharing your data", "!"),
+        (Exposure::Unknown, "Could not determine", "?"),
+        (Exposure::Protected, "Protecting you", "ok"),
+    ] {
+        let group: Vec<_> = scan.settings.iter().filter(|s| s.exposure == exposure).collect();
+        if group.is_empty() {
+            continue;
+        }
+        println!();
+        println!("{heading}");
+        for s in group {
+            let policy = if s.set_by_policy { " (set by policy)" } else { "" };
+            println!("  {mark:>2}  {:<42} {}{policy}", s.title, s.state);
+            if exposure != Exposure::Protected {
+                for line in wrap(s.explanation, 80) {
+                    println!("        {line}");
+                }
+            }
+        }
+    }
+
+    // Apps that update into versioned folders (Discord, Zoom) appear once per
+    // install path. Show each app once per capability: entries arrive sorted
+    // most recent first, so the first one seen is the latest use.
+    let mut used: Vec<(&AppAccess, usize)> = Vec::new();
+    for a in scan
+        .app_access
+        .iter()
+        .filter(|a| a.in_use_now || a.last_used_start_unix.is_some())
+    {
+        match used
+            .iter_mut()
+            .find(|(u, _)| u.capability == a.capability && u.app.eq_ignore_ascii_case(&a.app))
+        {
+            Some((_, paths)) => *paths += 1,
+            None => used.push((a, 1)),
+        }
+    }
+    println!();
+    println!("Apps that used your camera, microphone or location ({})", used.len());
+    if used.is_empty() {
+        println!("  None recorded.");
+        return;
+    }
+    let now = unix_now();
+    let shown = if all_apps { used.len() } else { RECENT_APPS.min(used.len()) };
+    for (a, paths) in &used[..shown] {
+        let when = if a.in_use_now {
+            "IN USE NOW".to_owned()
+        } else {
+            a.last_used_start_unix.map(|t| ago(now, t)).unwrap_or_default()
+        };
+        let versions = if *paths > 1 { format!("  ({paths} install folders)") } else { String::new() };
+        println!(
+            "  {:<11} {:<34} {when}{versions}",
+            a.capability.to_string(),
+            truncate(&a.app, 34)
+        );
+    }
+    if shown < used.len() {
+        println!("  ... and {} more (use --all-apps to list all)", used.len() - shown);
+    }
+}
+
+fn unix_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// "5 minutes ago", "3 days ago", ...
+fn ago(now: i64, then: i64) -> String {
+    let secs = (now - then).max(0);
+    let (n, unit) = match secs {
+        0..60 => return "just now".to_owned(),
+        60..3_600 => (secs / 60, "minute"),
+        3_600..86_400 => (secs / 3_600, "hour"),
+        86_400..2_592_000 => (secs / 86_400, "day"),
+        2_592_000..31_536_000 => (secs / 2_592_000, "month"),
+        _ => (secs / 31_536_000, "year"),
+    };
+    format!("{n} {unit}{} ago", if n == 1 { "" } else { "s" })
+}
+
+/// Greedy word wrap.
+fn wrap(text: &str, width: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        if !line.is_empty() && line.len() + 1 + word.len() > width {
+            lines.push(std::mem::take(&mut line));
+        }
+        if !line.is_empty() {
+            line.push(' ');
+        }
+        line.push_str(word);
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
 }
 
 fn print_report(r: &CookieReport, top: usize) {
@@ -134,7 +271,21 @@ fn thousands(n: usize) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{thousands, truncate};
+    use super::{ago, thousands, truncate, wrap};
+
+    #[test]
+    fn formats_relative_times() {
+        assert_eq!(ago(1_000, 990), "just now");
+        assert_eq!(ago(10_000, 10_000 - 60), "1 minute ago");
+        assert_eq!(ago(10_000_000, 10_000_000 - 3 * 86_400), "3 days ago");
+        assert_eq!(ago(100, 200), "just now");
+    }
+
+    #[test]
+    fn wraps_text() {
+        assert_eq!(wrap("one two three", 7), vec!["one two", "three"]);
+        assert!(wrap("", 10).is_empty());
+    }
 
     #[test]
     fn formats_thousands() {

@@ -2,3 +2,4 @@
 //! them classify or judge what they find.
 
 pub mod browsers;
+pub mod windows_privacy;

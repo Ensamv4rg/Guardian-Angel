@@ -9,6 +9,8 @@ Design proposal: https://claude.ai/artifact/PRVZ8nW3mQiCMLxHzkce4j
 Early development. Working today:
 
 - Browser cookie scanner for Chrome, Edge, Brave, Vivaldi, Opera, Opera GX and Firefox (domains and names only; values are never read)
+- Windows privacy settings scanner (diagnostic data, advertising ID, location, typing and speech, app tracking, suggested apps), read-only
+- History of which apps used the camera, microphone or location
 - Seed tracker list (~50 companies) in `data/sources/seed_trackers.json`
 - Report grouped by company
 - `guardian` command-line tool for development
@@ -25,6 +27,8 @@ Early development. Working today:
 cargo test --workspace
 cargo run -p ga-cli -- cookies
 cargo run -p ga-cli -- cookies --json
+cargo run -p ga-cli -- privacy
+cargo run -p ga-cli -- privacy --all-apps
 ```
 
 Close Chrome and Edge first: they lock their cookie databases while running.
