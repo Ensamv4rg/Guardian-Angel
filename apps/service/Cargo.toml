@@ -1,0 +1,24 @@
+[package]
+name = "ga-service"
+description = "Guardian Angel background service (and console mode for development)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "guardian-service"
+path = "src/main.rs"
+
+[dependencies]
+ga-engine.workspace = true
+ga-ipc.workspace = true
+tokio.workspace = true
+
+[target."cfg(windows)".dependencies]
+ga-platform-win.workspace = true
+windows-service = "0.8"
+
+[lints]
+workspace = true

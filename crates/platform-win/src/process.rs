@@ -4,13 +4,14 @@ use windows::Win32::System::Threading::{
 };
 use windows::core::PWSTR;
 
-/// Closes a process handle exactly once.
-struct OwnedHandle(HANDLE);
+/// Closes a handle exactly once.
+pub(crate) struct OwnedHandle(pub(crate) HANDLE);
 
 impl Drop for OwnedHandle {
     fn drop(&mut self) {
-        // SAFETY: the handle was returned by a successful OpenProcess call, is
-        // owned only by this struct, and is closed only here.
+        // SAFETY: the handle came from a successful OpenProcess or
+        // OpenProcessToken call, is owned only by this struct, and is closed
+        // only here.
         unsafe {
             let _ = CloseHandle(self.0);
         }

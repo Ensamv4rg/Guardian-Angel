@@ -140,3 +140,15 @@ fn reads_app_access_history() {
     assert_eq!(camera_app.allowed, Some(true));
     assert_eq!(camera_app.last_used_start_unix, None);
 }
+
+/// Read-only: the per-user view (HKEY_USERS\<SID>, used by the service)
+/// must see exactly what the current-user view sees.
+#[cfg(windows)]
+#[test]
+fn per_user_registry_matches_current_user() {
+    let sid = ga_platform_win::process_user_sid(std::process::id()).unwrap();
+    let mine = scan_privacy_with(&WindowsRegistry::default());
+    let via_sid = scan_privacy_with(&WindowsRegistry::for_user(&sid));
+    assert_eq!(mine.settings, via_sid.settings);
+    assert_eq!(mine.app_access.len(), via_sid.app_access.len());
+}

@@ -44,6 +44,9 @@ pub enum Category {
     AdVerification,
     TagManagement,
     CustomerData,
+    /// Crash and error reports (Sentry, Bugsnag). Usually include device
+    /// details and sometimes what you were doing when the app failed.
+    ErrorReporting,
     /// A large platform's own domain (google.com, yandex.ru) that also tracks.
     Platform,
 }
@@ -59,6 +62,7 @@ impl fmt::Display for Category {
             Category::AdVerification => "Ad verification",
             Category::TagManagement => "Tag management",
             Category::CustomerData => "Customer data",
+            Category::ErrorReporting => "Error reporting",
             Category::Platform => "Platform",
         })
     }
@@ -382,6 +386,52 @@ impl DecodedPayload {
         kinds.dedup();
         kinds
     }
+}
+
+/// How sure a finding is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub enum Confidence {
+    /// The SDK's own files or package are bundled with the app.
+    High,
+    /// The app's code mentions the tracker's address. It may or may not
+    /// send data there (the code could be an unused library).
+    Medium,
+}
+
+/// A tracking or telemetry SDK found inside an installed app.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AppFinding {
+    /// SDK or service name, e.g. "Sentry", or the company for address-only hits.
+    pub sdk: String,
+    pub company: String,
+    pub category: Category,
+    /// What it is used for, in plain words.
+    pub purpose: String,
+    pub confidence: Confidence,
+    /// Why we think so, e.g. "Bundled file: sentry.dll".
+    pub evidence: Vec<String>,
+}
+
+/// An installed desktop app and the SDKs found in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct InstalledApp {
+    pub name: String,
+    pub publisher: Option<String>,
+    pub version: Option<String>,
+    pub install_dir: String,
+    /// Built with Electron (a bundled Chromium browser running web code).
+    pub electron: bool,
+    pub findings: Vec<AppFinding>,
+    pub bytes_scanned: u64,
+    /// The scan stopped at the size limit before reading every file.
+    pub truncated: bool,
+}
+
+/// Result of scanning installed desktop apps for SDKs.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AppScan {
+    pub apps: Vec<InstalledApp>,
+    pub warnings: Vec<String>,
 }
 
 /// Lowercases a host and strips the leading dot browsers use for domain cookies.

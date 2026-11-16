@@ -30,6 +30,15 @@ enum Command {
         #[arg(long, default_value_t = 25)]
         top: usize,
     },
+    /// Find tracking and telemetry SDKs inside installed desktop apps.
+    Apps {
+        /// Print the full result as JSON instead of text.
+        #[arg(long)]
+        json: bool,
+        /// Also list apps where nothing was found.
+        #[arg(long)]
+        all: bool,
+    },
     /// List browser extensions and what they can access.
     Extensions {
         /// Print the full result as JSON instead of text.
@@ -70,6 +79,47 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Show (and with --apply, make) the privacy-friendly change for one
+    /// setting or all of them. Every change can be undone.
+    Fix {
+        /// Setting ID from `guardian privacy --json`, e.g. advertising_id.
+        setting: Option<String>,
+        /// Every setting that currently shares data.
+        #[arg(long)]
+        all: bool,
+        /// Make the changes. Without this, only shows what would change.
+        #[arg(long)]
+        apply: bool,
+    },
+    /// List changes Guardian Angel made, or undo one (by ID) or all of them.
+    Undo {
+        id: Option<String>,
+        #[arg(long)]
+        all: bool,
+    },
+    /// Send one request to the running service and print its JSON reply,
+    /// e.g. `guardian service status` or `guardian service apply_fix '{"setting_id":"location"}'`.
+    Service {
+        method: String,
+        /// Parameters as JSON, for methods that take them.
+        params: Option<String>,
+    },
+    /// Run the decrypting proxy to see what opted-in apps send. Does not
+    /// trust the certificate or change Windows' proxy settings.
+    Proxy {
+        /// Local port to listen on (127.0.0.1).
+        #[arg(long, default_value_t = 8899)]
+        port: u16,
+        /// Executable to inspect, e.g. `--inspect Discord.exe`. Repeatable.
+        #[arg(long = "inspect")]
+        apps: Vec<String>,
+        /// How long to run, in seconds.
+        #[arg(long, default_value_t = 120)]
+        seconds: u64,
+        /// Write the CA certificate (PEM) here and exit, so you can trust it yourself.
+        #[arg(long)]
+        export_ca: Option<std::path::PathBuf>,
+    },
     /// Watch which programs contact tracking companies, for a set time.
     Network {
         /// How long to watch, in seconds.
@@ -94,6 +144,16 @@ fn main() -> Result<()> {
                 print_report(&report, top);
             }
         }
+        Command::Apps { json, all } => {
+            let db = TrackerDb::bundled().context("loading the tracker list")?;
+            let started = std::time::Instant::now();
+            let scan = ga_scanners::apps::scan_apps(&db);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&scan)?);
+            } else {
+                print_apps(&scan, all, started.elapsed());
+            }
+        }
         Command::Extensions { json } => {
             let scan = ga_scanners::extensions::scan_extensions();
             if json {
@@ -116,6 +176,30 @@ fn main() -> Result<()> {
             seconds,
             upstream,
         } => run_dns(port, profile.into(), seconds, upstream)?,
+        Command::Fix { setting, all, apply } => run_fix(setting, all, apply)?,
+        Command::Service { method, params } => {
+            let mut envelope = serde_json::json!({ "id": 1, "method": method });
+            if let Some(p) = params {
+                envelope["params"] = serde_json::from_str(&p).context("params must be JSON")?;
+            }
+            let request: ga_ipc::RequestEnvelope =
+                serde_json::from_value(envelope).context("unknown method or wrong parameters")?;
+            let reply = tokio::runtime::Runtime::new()?.block_on(async {
+                let mut client = ga_ipc::connect().await?;
+                client.call(request.request).await
+            });
+            match reply {
+                Ok(v) => println!("{}", serde_json::to_string_pretty(&v)?),
+                Err(e) => anyhow::bail!("{e}"),
+            }
+        }
+        Command::Undo { id, all } => run_undo(id, all)?,
+        Command::Proxy {
+            port,
+            apps,
+            seconds,
+            export_ca,
+        } => run_proxy(port, apps, seconds, export_ca)?,
         Command::DecodeHar { file, json } => {
             let text = std::fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
             let decoded = ga_decoders::har::decode_har(&text)?;
@@ -215,6 +299,187 @@ fn run_dns(port: u16, profile: Profile, seconds: u64, upstream: Option<std::net:
     })
 }
 
+fn data_dir(sub: &str) -> Result<std::path::PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
+    Ok(std::path::PathBuf::from(local).join("GuardianAngel").join(sub))
+}
+
+fn run_fix(setting: Option<String>, all: bool, apply: bool) -> Result<()> {
+    use ga_blocker::settings::{self, SettingsError, journal::Journal, store::RegistryStore, store::WindowsStore};
+
+    let scan = ga_scanners::windows_privacy::scan_privacy();
+    let wanted: Vec<&ga_core::PrivacySetting> = match (&setting, all) {
+        (Some(id), _) => {
+            let s = scan.settings.iter().find(|s| s.id == id.as_str());
+            vec![s.with_context(|| format!("unknown setting '{id}'; see `guardian privacy --json` for IDs"))?]
+        }
+        (None, true) => scan.settings.iter().filter(|s| s.exposure == Exposure::Exposed).collect(),
+        (None, false) => anyhow::bail!("name a setting (e.g. `guardian fix advertising_id`) or use --all"),
+    };
+
+    let mut store = WindowsStore::default();
+    let journal = Journal::open(&data_dir("changes")?)?;
+    let now = unix_now();
+    let mut planned = 0;
+    for s in wanted {
+        let Some(fix) = settings::fix_for(s.id) else { continue };
+        planned += 1;
+        let mut notes = Vec::new();
+        if fix.needs_admin {
+            notes.push("needs administrator rights");
+        }
+        if fix.needs_restart {
+            notes.push("takes effect after signing out");
+        }
+        let notes = if notes.is_empty() { String::new() } else { format!("  ({})", notes.join(", ")) };
+        println!("{}{notes}", fix.title);
+        for w in fix.writes {
+            let current = store.get(w.hive, w.path, w.name).ok().flatten();
+            let show = |v: Option<&ga_blocker::settings::store::RegValue>| match v {
+                None => "not set".to_owned(),
+                Some(ga_blocker::settings::store::RegValue::Dword(n)) => n.to_string(),
+                Some(ga_blocker::settings::store::RegValue::String(t)) => format!("\"{t}\""),
+            };
+            let new = match &w.value {
+                ga_blocker::settings::FixValue::Dword(n) => n.to_string(),
+                ga_blocker::settings::FixValue::Str(t) => format!("\"{t}\""),
+            };
+            println!("    {}\\{}\\{}: {} -> {new}", w.hive.prefix(), w.path, w.name, show(current.as_ref()));
+        }
+        if apply {
+            match settings::apply(&mut store, &journal, fix, now) {
+                Ok(rec) => println!("    Done. Undo with: guardian undo {}", rec.id),
+                Err(SettingsError::NothingToChange) => println!("    Already set; nothing changed."),
+                Err(SettingsError::NeedsAdmin) => println!("    Skipped: needs administrator rights (the service will handle this)."),
+                Err(e) => println!("    Not changed: {e}"),
+            }
+        }
+    }
+    if planned == 0 {
+        println!("Nothing to fix.");
+    } else if !apply {
+        println!();
+        println!("Nothing was changed. Add --apply to make these changes; `guardian undo` reverses them.");
+    }
+    Ok(())
+}
+
+fn run_undo(id: Option<String>, all: bool) -> Result<()> {
+    use ga_blocker::settings::{self, journal::Journal, store::WindowsStore};
+    let journal = Journal::open(&data_dir("changes")?)?;
+    let mut store = WindowsStore::default();
+    let print = |title: &str, r: &settings::UndoReport| {
+        println!("Undid: {title} ({} value(s) restored)", r.restored);
+        for s in &r.skipped_changed_since {
+            println!("    Left alone (you changed it since): {s}");
+        }
+    };
+    match (id, all) {
+        (Some(id), _) => {
+            let title = journal.load(&id).map(|r| r.title).unwrap_or_else(|_| id.clone());
+            let report = settings::undo(&mut store, &journal, &id)?;
+            print(&title, &report);
+        }
+        (None, true) => {
+            let done = settings::undo_all(&mut store, &journal)?;
+            if done.is_empty() {
+                println!("No changes to undo.");
+            }
+            for (title, report) in &done {
+                print(title, report);
+            }
+        }
+        (None, false) => {
+            let active = journal.active()?;
+            if active.is_empty() {
+                println!("Guardian Angel has not changed any settings.");
+            }
+            for r in active {
+                println!("  {}  {}  ({} ago)", r.id, r.title, ago(unix_now(), r.applied_unix));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn ca_dir() -> Result<std::path::PathBuf> {
+    let local = std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is not set")?;
+    Ok(std::path::PathBuf::from(local).join("GuardianAngel").join("ca"))
+}
+
+fn run_proxy(port: u16, apps: Vec<String>, seconds: u64, export_ca: Option<std::path::PathBuf>) -> Result<()> {
+    use ga_proxy::{CertAuthority, Proxy, ProxyConfig, ProxyEvent, Rules};
+    use std::sync::{Arc, RwLock};
+
+    let dir = ca_dir()?;
+    let ca = Arc::new(CertAuthority::load_or_create(&dir).context("loading the inspection certificate")?);
+    if let Some(path) = export_ca {
+        std::fs::write(&path, ca.cert_pem())?;
+        println!("Wrote the Guardian Angel inspection certificate to {}.", path.display());
+        println!("It is unique to this computer. Trusting it lets Guardian Angel read the HTTPS");
+        println!("traffic of the apps you choose. Only trust it if you want that.");
+        return Ok(());
+    }
+    anyhow::ensure!(!apps.is_empty(), "Name at least one app to inspect, e.g. --inspect Discord.exe");
+
+    let db = TrackerDb::bundled().context("loading the tracker list")?;
+    let rules = Arc::new(RwLock::new(Rules::for_apps(apps.iter().map(String::as_str))));
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
+
+    tokio::runtime::Runtime::new()?.block_on(async {
+        let proxy = Proxy::bind(
+            ProxyConfig::new(std::net::SocketAddr::from(([127, 0, 0, 1], port))),
+            ca,
+            rules.clone(),
+            tx,
+            ga_proxy::windows_app_resolver(),
+        )
+        .await
+        .map_err(|e| anyhow::anyhow!("could not start the proxy on 127.0.0.1:{port}: {e}"))?;
+
+        println!("Inspecting {} through 127.0.0.1:{port} for {seconds} s.", apps.join(", "));
+        println!("Windows is not using this proxy; start an app with it (e.g. an Electron app with");
+        println!("--proxy-server=127.0.0.1:{port}) after trusting the certificate (--export-ca).");
+
+        let run = tokio::spawn(proxy.run());
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(seconds);
+        let (mut tunneled, mut inspected) = (0u64, 0u64);
+        while let Ok(Some(event)) = tokio::time::timeout_at(deadline, rx.recv()).await {
+            match event {
+                ProxyEvent::Tunneled { .. } => tunneled += 1,
+                ProxyEvent::AppRejectedInspection { app, host } => println!(
+                    "  {} refused inspection of {host}; it will be passed through untouched from now on.",
+                    app.as_deref().unwrap_or("An app")
+                ),
+                ProxyEvent::Inspected(r) => {
+                    inspected += 1;
+                    let app = r.app.as_deref().unwrap_or("?");
+                    let company = db.classify(&r.host).map(|m| m.company);
+                    if r.payloads.is_empty() {
+                        let tag = company.map(|c| format!("  [{c}]")).unwrap_or_default();
+                        println!("  {app}: {} {}{}{tag}", r.method, r.host, truncate(&r.path, 60));
+                    }
+                    for p in &r.payloads {
+                        let sent: Vec<&str> = p.kinds().iter().map(|k| k.describe()).collect();
+                        println!("  {app} -> {} ({}) received {}.", p.product, p.company, sent.join(", "));
+                        for f in &p.fields {
+                            println!("        {:<32} {}", truncate(&f.label, 32), truncate(&f.value, 70));
+                        }
+                    }
+                }
+            }
+        }
+        run.abort();
+        let bypassed: Vec<String> = rules.read().unwrap_or_else(|p| p.into_inner()).bypassed_hosts().map(str::to_owned).collect();
+        println!();
+        println!("{inspected} requests inspected, {tunneled} connections passed through untouched.");
+        if !bypassed.is_empty() {
+            println!("Apps refused inspection for: {}", bypassed.join(", "));
+        }
+        anyhow::Ok(())
+    })
+}
+
 fn print_har(r: &ga_decoders::har::HarDecode, db: &TrackerDb) {
     println!("Guardian Angel - what trackers received");
     println!(
@@ -291,6 +556,41 @@ fn print_network(r: &NetworkReport) {
                 thousands(p.tracker_lookups as usize),
                 truncate(&join(&p.companies), 50)
             );
+        }
+    }
+}
+
+fn print_apps(scan: &ga_core::AppScan, all: bool, took: std::time::Duration) {
+    let with: Vec<_> = scan.apps.iter().filter(|a| !a.findings.is_empty()).collect();
+    let bytes: u64 = scan.apps.iter().map(|a| a.bytes_scanned).sum();
+    println!("Guardian Angel - tracking SDKs in desktop apps");
+    println!(
+        "Scanned {} apps ({} MB of code) in {:.0} s. {} contain tracking or telemetry code.",
+        scan.apps.len(),
+        thousands((bytes / 1_048_576) as usize),
+        took.as_secs_f64(),
+        with.len()
+    );
+    println!("  [sure]     = the SDK itself is bundled with the app");
+    println!("  [mentions] = the app's code contains the tracker's address; it may or may not send data there");
+
+    for app in &scan.apps {
+        if app.findings.is_empty() && !all {
+            continue;
+        }
+        println!();
+        let kind = if app.electron { "  (Electron)" } else { "" };
+        let cut = if app.truncated { "  (large app: partly scanned)" } else { "" };
+        println!("  {}{kind}{cut}", app.name);
+        for f in &app.findings {
+            let mark = match f.confidence {
+                ga_core::Confidence::High => "[sure]    ",
+                ga_core::Confidence::Medium => "[mentions]",
+            };
+            println!("    {mark} {} ({}): {}", f.sdk, f.category, f.purpose);
+            if let Some(e) = f.evidence.first() {
+                println!("               {}", truncate(e, 100));
+            }
         }
     }
 }

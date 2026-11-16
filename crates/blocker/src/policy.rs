@@ -13,7 +13,8 @@ pub enum Profile {
     /// Also analytics and session recording.
     #[default]
     Balanced,
-    /// Also social widgets, tag managers and customer-data tools. May break
+    /// Also social widgets, tag managers, customer-data tools and error
+    /// reporting. May break
     /// embedded posts, chat widgets and some sign-up forms.
     Strict,
 }
@@ -26,7 +27,7 @@ impl Profile {
             Platform => false,
             Advertising | AudienceData | AdVerification => true,
             Analytics | SessionRecording => self != Profile::Relaxed,
-            Social | TagManagement | CustomerData => self == Profile::Strict,
+            Social | TagManagement | CustomerData | ErrorReporting => self == Profile::Strict,
         }
     }
 }

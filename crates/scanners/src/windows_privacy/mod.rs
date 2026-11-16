@@ -16,7 +16,7 @@ pub use registry::WindowsRegistry;
 /// Scans the current user's Windows privacy settings.
 #[cfg(windows)]
 pub fn scan_privacy() -> PrivacyScan {
-    scan_privacy_with(&WindowsRegistry)
+    scan_privacy_with(&WindowsRegistry::default())
 }
 
 /// Scans privacy settings from any registry source.

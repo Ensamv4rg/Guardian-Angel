@@ -106,6 +106,13 @@ impl TrackerDb {
         }
     }
 
+    /// Every listed domain with its company and category.
+    pub fn entries(&self) -> impl Iterator<Item = (&str, &str, Category)> {
+        self.domains
+            .iter()
+            .map(|(domain, (idx, category))| (domain.as_str(), self.companies[*idx].as_str(), *category))
+    }
+
     pub fn company_count(&self) -> usize {
         self.companies.len()
     }

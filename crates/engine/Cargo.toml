@@ -1,0 +1,30 @@
+[package]
+name = "ga-engine"
+description = "The Guardian Angel engine: scans per user, alerts, network monitor and proxy, behind the IPC protocol"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ga-blocker.workspace = true
+ga-core.workspace = true
+ga-ipc.workspace = true
+ga-knowledge.workspace = true
+ga-proxy.workspace = true
+ga-report.workspace = true
+ga-scanners.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[target."cfg(windows)".dependencies]
+ga-netmon.workspace = true
+ga-platform-win.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

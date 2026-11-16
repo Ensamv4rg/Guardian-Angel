@@ -1,0 +1,92 @@
+import { type ReactElement, useCallback, useEffect, useState } from "react";
+import { call, errorText } from "./api";
+import type { Overview } from "./types";
+import logo from "../src-tauri/icons/128x128.png";
+import OverviewPage from "./pages/Overview";
+import TrackersPage from "./pages/Trackers";
+import AppsPage from "./pages/Apps";
+import NetworkPage from "./pages/Network";
+import InspectPage from "./pages/Inspect";
+import ExtensionsPage from "./pages/Extensions";
+import SettingsPage from "./pages/Settings";
+import AlertsPage from "./pages/Alerts";
+
+export type Page = "overview" | "trackers" | "apps" | "network" | "inspect" | "extensions" | "settings" | "alerts";
+
+export interface PageProps {
+  overview: Overview | null;
+  refresh: () => Promise<void>;
+  go: (p: Page) => void;
+}
+
+const SECTIONS: { title: string; pages: [Page, string][] }[] = [
+  { title: "", pages: [["overview", "Overview"]] },
+  { title: "Who collects data", pages: [["trackers", "Trackers"], ["apps", "Apps"], ["network", "Network"], ["inspect", "Inspect traffic"]] },
+  { title: "Your setup", pages: [["extensions", "Extensions"], ["settings", "Windows settings"], ["alerts", "Alerts"]] },
+];
+
+export default function App() {
+  const [page, setPage] = useState<Page>("overview");
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setOverview(await call<Overview>("overview"));
+      setError(null);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  }, []);
+
+  // Poll quickly while a scan runs, slowly otherwise.
+  useEffect(() => {
+    refresh();
+    const scanning = overview?.scanning ?? true;
+    const id = setInterval(refresh, scanning ? 3000 : 30000);
+    return () => clearInterval(id);
+  }, [refresh, overview?.scanning]);
+
+  const props: PageProps = { overview, refresh, go: setPage };
+  const pages: Record<Page, ReactElement> = {
+    overview: <OverviewPage {...props} />,
+    trackers: <TrackersPage {...props} />,
+    apps: <AppsPage {...props} />,
+    network: <NetworkPage {...props} />,
+    inspect: <InspectPage {...props} />,
+    extensions: <ExtensionsPage {...props} />,
+    settings: <SettingsPage {...props} />,
+    alerts: <AlertsPage {...props} />,
+  };
+
+  return (
+    <div className="shell">
+      <nav className="sidebar" aria-label="Sections">
+        <div className="brand">
+          <img src={logo} alt="" />
+          Guardian Angel
+        </div>
+        {SECTIONS.map((s) => (
+          <div key={s.title}>
+            {s.title && <div className="nav-section">{s.title}</div>}
+            {s.pages.map(([id, label]) => (
+              <button key={id} className={`nav ${page === id ? "active" : ""}`} onClick={() => setPage(id)}>
+                {label}
+                {id === "alerts" && (overview?.unread_alerts ?? 0) > 0 && <span className="count">{overview?.unread_alerts}</span>}
+              </button>
+            ))}
+          </div>
+        ))}
+        <div className="foot">Everything is analysed on this computer. Nothing is sent anywhere.</div>
+      </nav>
+      <main>
+        {error && (
+          <div className="notice error">
+            {error} Start it with <span className="mono">guardian-service console</span> (development) or install the service.
+          </div>
+        )}
+        {pages[page]}
+      </main>
+    </div>
+  );
+}

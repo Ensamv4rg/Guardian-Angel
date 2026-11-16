@@ -27,16 +27,29 @@ pub trait Registry {
 }
 
 /// The real Windows registry, opened with read access only.
+///
+/// By default `CurrentUser` means the user this process runs as. A service
+/// running as SYSTEM uses [`WindowsRegistry::for_user`] to read a signed-in
+/// user's hive (`HKEY_USERS\<SID>`) instead.
 #[cfg(windows)]
-#[derive(Debug, Default, Clone, Copy)]
-pub struct WindowsRegistry;
+#[derive(Debug, Default, Clone)]
+pub struct WindowsRegistry {
+    user_sid: Option<String>,
+}
 
 #[cfg(windows)]
 impl WindowsRegistry {
-    fn root(hive: Hive) -> &'static windows_registry::Key {
-        match hive {
-            Hive::LocalMachine => windows_registry::LOCAL_MACHINE,
-            Hive::CurrentUser => windows_registry::CURRENT_USER,
+    pub fn for_user(sid: &str) -> Self {
+        Self {
+            user_sid: Some(sid.to_owned()),
+        }
+    }
+
+    fn open(&self, hive: Hive, path: &str) -> Option<windows_registry::Key> {
+        match (hive, &self.user_sid) {
+            (Hive::LocalMachine, _) => windows_registry::LOCAL_MACHINE.open(path).ok(),
+            (Hive::CurrentUser, None) => windows_registry::CURRENT_USER.open(path).ok(),
+            (Hive::CurrentUser, Some(sid)) => windows_registry::USERS.open(format!(r"{sid}\{path}")).ok(),
         }
     }
 }
@@ -44,21 +57,20 @@ impl WindowsRegistry {
 #[cfg(windows)]
 impl Registry for WindowsRegistry {
     fn dword(&self, hive: Hive, path: &str, name: &str) -> Option<u32> {
-        Self::root(hive).open(path).ok()?.get_u32(name).ok()
+        self.open(hive, path)?.get_u32(name).ok()
     }
 
     fn qword(&self, hive: Hive, path: &str, name: &str) -> Option<u64> {
-        Self::root(hive).open(path).ok()?.get_u64(name).ok()
+        self.open(hive, path)?.get_u64(name).ok()
     }
 
     fn string(&self, hive: Hive, path: &str, name: &str) -> Option<String> {
-        Self::root(hive).open(path).ok()?.get_string(name).ok()
+        self.open(hive, path)?.get_string(name).ok()
     }
 
     fn subkeys(&self, hive: Hive, path: &str) -> Vec<String> {
-        Self::root(hive)
-            .open(path)
-            .and_then(|key| key.keys().map(Iterator::collect))
+        self.open(hive, path)
+            .and_then(|key| key.keys().ok().map(Iterator::collect))
             .unwrap_or_default()
     }
 }

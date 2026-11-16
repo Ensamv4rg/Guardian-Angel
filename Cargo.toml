@@ -8,8 +8,13 @@ members = [
     "crates/netmon",
     "crates/blocker",
     "crates/decoders",
+    "crates/proxy",
+    "crates/ipc",
+    "crates/engine",
     "crates/platform-win",
     "apps/cli",
+    "apps/service",
+    "apps/desktop/src-tauri",
 ]
 
 [workspace.package]
@@ -27,6 +32,9 @@ ga-report = { path = "crates/report" }
 ga-netmon = { path = "crates/netmon" }
 ga-blocker = { path = "crates/blocker" }
 ga-decoders = { path = "crates/decoders" }
+ga-proxy = { path = "crates/proxy" }
+ga-ipc = { path = "crates/ipc" }
+ga-engine = { path = "crates/engine" }
 ga-platform-win = { path = "crates/platform-win" }
 
 anyhow = "1.0"
@@ -38,7 +46,7 @@ tempfile = "3.27"
 url = "2.5"
 thiserror = "2.0"
 hickory-proto = { version = "0.26", default-features = false, features = ["std"] }
-tokio = { version = "1.54", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
+tokio = { version = "1.54", features = ["rt-multi-thread", "net", "time", "sync", "macros", "io-util", "signal"] }
 
 # Only the future `platform-win` crate may contain unsafe code (see design doc).
 [workspace.lints.rust]
