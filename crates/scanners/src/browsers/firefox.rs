@@ -30,6 +30,15 @@ pub(super) fn scan(roots: &BrowserRoots, scan: &mut CookieScan) {
     }
 }
 
+/// Every Firefox profile folder, with its display name.
+pub(crate) fn profiles(roots: &BrowserRoots) -> Vec<(String, std::path::PathBuf)> {
+    let Some(app_data) = &roots.app_data else { return Vec::new() };
+    subdirs(&app_data.join(r"Mozilla\Firefox\Profiles"))
+        .into_iter()
+        .map(|dir| (profile_name(&dir_name(&dir)), dir))
+        .collect()
+}
+
 /// Firefox folders look like `x1y2z3.default-release`; show `default-release`.
 fn profile_name(folder: &str) -> String {
     folder

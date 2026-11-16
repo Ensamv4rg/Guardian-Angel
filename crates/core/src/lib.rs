@@ -190,6 +190,91 @@ pub struct PrivacyScan {
     pub app_access: Vec<AppAccess>,
 }
 
+/// Where an extension was installed from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub enum ExtensionSource {
+    /// The browser's official store (Chrome Web Store, Edge Add-ons, addons.mozilla.org).
+    Store,
+    /// Installed by another program or the registry, not by the user from a store.
+    Sideloaded,
+    /// Forced by an organisation's policy.
+    Policy,
+    /// Loaded from a folder in developer mode.
+    Developer,
+    Unknown,
+}
+
+impl fmt::Display for ExtensionSource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            ExtensionSource::Store => "Store",
+            ExtensionSource::Sideloaded => "Installed by another program",
+            ExtensionSource::Policy => "Installed by policy",
+            ExtensionSource::Developer => "Developer mode",
+            ExtensionSource::Unknown => "Unknown",
+        })
+    }
+}
+
+/// Which websites an extension can read and change.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub enum SiteAccess {
+    AllSites,
+    /// Host patterns such as `*.google.com`.
+    SomeSites(Vec<String>),
+    NoSites,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub enum Risk {
+    High,
+    Medium,
+    Low,
+}
+
+impl fmt::Display for Risk {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Risk::High => "High",
+            Risk::Medium => "Medium",
+            Risk::Low => "Low",
+        })
+    }
+}
+
+/// A browser permission that gives access to personal data.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SensitivePermission {
+    pub permission: String,
+    /// What it allows, in plain words.
+    pub meaning: &'static str,
+}
+
+/// An installed browser extension and what it can access (FR-2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct BrowserExtension {
+    pub browser: Browser,
+    pub profile: String,
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub enabled: bool,
+    pub source: ExtensionSource,
+    pub site_access: SiteAccess,
+    pub sensitive_permissions: Vec<SensitivePermission>,
+    pub risk: Risk,
+    /// Plain-language reasons for the risk level, most serious first.
+    pub risk_reasons: Vec<String>,
+}
+
+/// Result of scanning every browser profile for extensions.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ExtensionScan {
+    pub extensions: Vec<BrowserExtension>,
+    pub warnings: Vec<ScanWarning>,
+    pub profiles_scanned: usize,
+}
+
 /// Lowercases a host and strips the leading dot browsers use for domain cookies.
 pub fn normalize_host(host: &str) -> String {
     host.trim().trim_start_matches('.').to_ascii_lowercase()

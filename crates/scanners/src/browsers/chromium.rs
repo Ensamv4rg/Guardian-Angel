@@ -23,7 +23,17 @@ const INSTALLS: &[(Browser, Root, &str)] = &[
     (Browser::OperaGx, Root::Roaming, r"Opera Software\Opera GX Stable"),
 ];
 
-pub(super) fn scan(roots: &BrowserRoots, scan: &mut CookieScan) {
+/// A Chromium browser profile folder.
+pub(crate) struct Profile {
+    pub browser: Browser,
+    pub name: String,
+    pub dir: PathBuf,
+}
+
+/// Finds every Chromium profile under the given roots. A folder counts as a
+/// profile if it holds preferences or a cookie database.
+pub(crate) fn profiles(roots: &BrowserRoots) -> Vec<Profile> {
+    let mut found = Vec::new();
     for (browser, root, rel) in INSTALLS {
         let base = match root {
             Root::Local => roots.local_app_data.as_ref(),
@@ -40,18 +50,35 @@ pub(super) fn scan(roots: &BrowserRoots, scan: &mut CookieScan) {
         let mut candidates = vec![user_data.clone()];
         candidates.extend(subdirs(&user_data));
 
-        for profile_dir in candidates {
-            let Some(db) = cookie_db(&profile_dir) else { continue };
-            let profile = if profile_dir == user_data {
+        for dir in candidates {
+            let is_profile = dir.join("Preferences").is_file()
+                || dir.join("Secure Preferences").is_file()
+                || cookie_db(&dir).is_some();
+            if !is_profile {
+                continue;
+            }
+            let name = if dir == user_data {
                 "Default".to_owned()
             } else {
-                dir_name(&profile_dir)
+                dir_name(&dir)
             };
-            scan.profiles_scanned += 1;
-            match read_profile(&db, *browser, &profile) {
-                Ok(mut cookies) => scan.cookies.append(&mut cookies),
-                Err(message) => warn(scan, *browser, &profile, message),
-            }
+            found.push(Profile {
+                browser: *browser,
+                name,
+                dir,
+            });
+        }
+    }
+    found
+}
+
+pub(super) fn scan(roots: &BrowserRoots, scan: &mut CookieScan) {
+    for profile in profiles(roots) {
+        let Some(db) = cookie_db(&profile.dir) else { continue };
+        scan.profiles_scanned += 1;
+        match read_profile(&db, profile.browser, &profile.name) {
+            Ok(mut cookies) => scan.cookies.append(&mut cookies),
+            Err(message) => warn(scan, profile.browser, &profile.name, message),
         }
     }
 }

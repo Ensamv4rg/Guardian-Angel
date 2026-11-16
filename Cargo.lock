@@ -212,6 +212,7 @@ version = "0.1.0"
 dependencies = [
  "ga-core",
  "rusqlite",
+ "serde_json",
  "tempfile",
  "windows-registry",
 ]

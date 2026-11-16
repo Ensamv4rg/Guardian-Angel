@@ -5,8 +5,8 @@
 //! cookie's host, name and last-access time are read; values are never
 //! selected (requirement NFR-5).
 
-mod chromium;
-mod firefox;
+pub(crate) mod chromium;
+pub(crate) mod firefox;
 
 use ga_core::{Browser, CookieScan, ScanWarning};
 use std::io;
@@ -92,7 +92,7 @@ fn warn(scan: &mut CookieScan, browser: Browser, profile: &str, message: String)
 }
 
 /// Subfolders of `dir`, sorted for stable output. Unreadable entries are skipped.
-fn subdirs(dir: &Path) -> Vec<PathBuf> {
+pub(crate) fn subdirs(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
@@ -105,7 +105,7 @@ fn subdirs(dir: &Path) -> Vec<PathBuf> {
     dirs
 }
 
-fn dir_name(path: &Path) -> String {
+pub(crate) fn dir_name(path: &Path) -> String {
     path.file_name()
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default()

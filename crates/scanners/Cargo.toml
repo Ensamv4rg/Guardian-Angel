@@ -1,6 +1,6 @@
 [package]
 name = "ga-scanners"
-description = "Local scanners: browser cookies (more to come)"
+description = "Local scanners: browser cookies, browser extensions, Windows privacy settings"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,10 +10,11 @@ publish.workspace = true
 [dependencies]
 ga-core.workspace = true
 rusqlite.workspace = true
+serde_json.workspace = true
 tempfile.workspace = true
-
-[lints]
-workspace = true
 
 [target."cfg(windows)".dependencies]
 windows-registry = "0.6.1"
+
+[lints]
+workspace = true

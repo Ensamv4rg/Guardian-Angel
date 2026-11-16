@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use ga_core::{AppAccess, Exposure, PrivacyScan};
+use ga_core::{AppAccess, ExtensionScan, ExtensionSource, Exposure, PrivacyScan, Risk, SiteAccess};
 use ga_knowledge::TrackerDb;
 use ga_report::{CookieReport, build_cookie_report};
 use std::collections::BTreeSet;
@@ -28,6 +28,12 @@ enum Command {
         /// How many companies to list (0 = all).
         #[arg(long, default_value_t = 25)]
         top: usize,
+    },
+    /// List browser extensions and what they can access.
+    Extensions {
+        /// Print the full result as JSON instead of text.
+        #[arg(long)]
+        json: bool,
     },
     /// Check Windows privacy settings and which apps used your camera,
     /// microphone or location.
@@ -54,6 +60,14 @@ fn main() -> Result<()> {
                 print_report(&report, top);
             }
         }
+        Command::Extensions { json } => {
+            let scan = ga_scanners::extensions::scan_extensions();
+            if json {
+                println!("{}", serde_json::to_string_pretty(&scan)?);
+            } else {
+                print_extensions(&scan);
+            }
+        }
         Command::Privacy { json, all_apps } => {
             let scan = ga_scanners::windows_privacy::scan_privacy();
             if json {
@@ -64,6 +78,47 @@ fn main() -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn print_extensions(scan: &ExtensionScan) {
+    let count = |r: Risk| scan.extensions.iter().filter(|e| e.risk == r).count();
+    println!("Guardian Angel - browser extensions");
+    println!(
+        "Scanned {} browser profile(s) and found {} extensions: {} high risk, {} medium, {} low.",
+        scan.profiles_scanned,
+        scan.extensions.len(),
+        count(Risk::High),
+        count(Risk::Medium),
+        count(Risk::Low)
+    );
+
+    for e in &scan.extensions {
+        println!();
+        let disabled = if e.enabled { "" } else { "  [disabled]" };
+        println!(
+            "  [{}] {} {}  ({} / {}){disabled}",
+            e.risk, e.name, e.version, e.browser, e.profile
+        );
+        if e.source != ExtensionSource::Store {
+            println!("        Source: {}", e.source);
+        }
+        for reason in &e.risk_reasons {
+            println!("        - {reason}");
+        }
+        if let SiteAccess::SomeSites(hosts) = &e.site_access
+            && hosts.len() > 1
+        {
+            println!("        Sites: {}", truncate(&hosts.join(", "), 90));
+        }
+    }
+
+    if !scan.warnings.is_empty() {
+        println!();
+        println!("Could not scan everything:");
+        for w in &scan.warnings {
+            println!("  ! {} ({}): {}", w.browser, w.profile, w.message);
+        }
+    }
 }
 
 /// How many recently used apps to list without `--all-apps`.

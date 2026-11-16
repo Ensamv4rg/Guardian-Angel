@@ -9,11 +9,19 @@ Design proposal: https://claude.ai/artifact/PRVZ8nW3mQiCMLxHzkce4j
 Early development. Working today:
 
 - Browser cookie scanner for Chrome, Edge, Brave, Vivaldi, Opera, Opera GX and Firefox (domains and names only; values are never read)
+- Browser extension scanner for Chromium browsers and Firefox: granted site access, sensitive permissions, install source, risk level
 - Windows privacy settings scanner (diagnostic data, advertising ID, location, typing and speech, app tracking, suggested apps), read-only
 - History of which apps used the camera, microphone or location
 - Seed tracker list (~50 companies) in `data/sources/seed_trackers.json`
 - Report grouped by company
 - `guardian` command-line tool for development
+
+## Known gaps before release
+
+- Scanners read the **current user** only (`%LOCALAPPDATA%`, `%APPDATA%`, `HKCU`). When the engine runs as a Windows Service (SYSTEM), it must enumerate every user profile folder and registry hive (`HKEY_USERS\<SID>`). Folder roots and the registry are already injected, not hardcoded, to allow this.
+- Tested on Windows 10 22H2 only. Needs a test matrix: Windows 11, clean installs, Home / Pro / Enterprise.
+- Windows 11-only settings (e.g. Recall) are not checked yet.
+- Activity history is not reported: only its Group Policy values are reliably readable.
 
 ## Requirements
 
@@ -27,6 +35,7 @@ Early development. Working today:
 cargo test --workspace
 cargo run -p ga-cli -- cookies
 cargo run -p ga-cli -- cookies --json
+cargo run -p ga-cli -- extensions
 cargo run -p ga-cli -- privacy
 cargo run -p ga-cli -- privacy --all-apps
 ```
