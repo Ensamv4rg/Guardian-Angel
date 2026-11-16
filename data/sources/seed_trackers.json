@@ -1,0 +1,196 @@
+{
+  "version": 1,
+  "note": "Hand-curated seed list for early development. Replace with a build from DuckDuckGo Tracker Radar, Disconnect and EasyPrivacy once their licences are checked (see design doc, Risks).",
+  "companies": [
+    { "name": "Google", "domains": {
+      "doubleclick.net": "advertising",
+      "googlesyndication.com": "advertising",
+      "googleadservices.com": "advertising",
+      "googletagservices.com": "advertising",
+      "2mdn.net": "advertising",
+      "admob.com": "advertising",
+      "google-analytics.com": "analytics",
+      "app-measurement.com": "analytics",
+      "googletagmanager.com": "tag_management",
+      "google.com": "platform",
+      "youtube.com": "platform"
+    }},
+    { "name": "Meta", "domains": {
+      "facebook.com": "social",
+      "facebook.net": "advertising",
+      "instagram.com": "social"
+    }},
+    { "name": "Microsoft", "domains": {
+      "bing.com": "advertising",
+      "adnxs.com": "advertising",
+      "clarity.ms": "session_recording",
+      "linkedin.com": "social",
+      "licdn.com": "social"
+    }},
+    { "name": "Amazon", "domains": {
+      "amazon-adsystem.com": "advertising"
+    }},
+    { "name": "X Corp", "domains": {
+      "ads-twitter.com": "advertising",
+      "twitter.com": "social",
+      "x.com": "social",
+      "t.co": "social"
+    }},
+    { "name": "ByteDance", "domains": {
+      "tiktok.com": "social"
+    }},
+    { "name": "Pinterest", "domains": {
+      "pinterest.com": "social"
+    }},
+    { "name": "Snap", "domains": {
+      "snapchat.com": "social",
+      "sc-static.net": "advertising"
+    }},
+    { "name": "Reddit", "domains": {
+      "reddit.com": "social"
+    }},
+    { "name": "Criteo", "domains": {
+      "criteo.com": "advertising",
+      "criteo.net": "advertising",
+      "bidswitch.net": "advertising"
+    }},
+    { "name": "Taboola", "domains": {
+      "taboola.com": "advertising"
+    }},
+    { "name": "Outbrain", "domains": {
+      "outbrain.com": "advertising"
+    }},
+    { "name": "The Trade Desk", "domains": {
+      "adsrvr.org": "advertising"
+    }},
+    { "name": "Magnite", "domains": {
+      "rubiconproject.com": "advertising"
+    }},
+    { "name": "PubMatic", "domains": {
+      "pubmatic.com": "advertising"
+    }},
+    { "name": "OpenX", "domains": {
+      "openx.net": "advertising"
+    }},
+    { "name": "Index Exchange", "domains": {
+      "casalemedia.com": "advertising",
+      "indexww.com": "advertising"
+    }},
+    { "name": "TripleLift", "domains": {
+      "3lift.com": "advertising"
+    }},
+    { "name": "Sharethrough", "domains": {
+      "sharethrough.com": "advertising"
+    }},
+    { "name": "Equativ", "domains": {
+      "smartadserver.com": "advertising"
+    }},
+    { "name": "Media.net", "domains": {
+      "media.net": "advertising"
+    }},
+    { "name": "Sovrn", "domains": {
+      "lijit.com": "advertising"
+    }},
+    { "name": "GumGum", "domains": {
+      "gumgum.com": "advertising"
+    }},
+    { "name": "Yahoo", "domains": {
+      "yahoo.com": "platform",
+      "advertising.com": "advertising"
+    }},
+    { "name": "Yandex", "domains": {
+      "yandex.ru": "platform",
+      "yandex.com": "platform"
+    }},
+    { "name": "Adobe", "domains": {
+      "demdex.net": "audience_data",
+      "omtrdc.net": "analytics",
+      "everesttech.net": "advertising",
+      "adobedtm.com": "tag_management"
+    }},
+    { "name": "Oracle", "domains": {
+      "bluekai.com": "audience_data",
+      "addthis.com": "social",
+      "moatads.com": "ad_verification"
+    }},
+    { "name": "Salesforce", "domains": {
+      "krxd.net": "audience_data",
+      "exacttarget.com": "customer_data"
+    }},
+    { "name": "LiveRamp", "domains": {
+      "rlcdn.com": "audience_data"
+    }},
+    { "name": "Lotame", "domains": {
+      "crwdcntrl.net": "audience_data"
+    }},
+    { "name": "TransUnion", "domains": {
+      "agkn.com": "audience_data"
+    }},
+    { "name": "Experian", "domains": {
+      "tapad.com": "audience_data"
+    }},
+    { "name": "ID5", "domains": {
+      "id5-sync.com": "audience_data"
+    }},
+    { "name": "Comscore", "domains": {
+      "scorecardresearch.com": "analytics"
+    }},
+    { "name": "Quantcast", "domains": {
+      "quantserve.com": "analytics",
+      "quantcount.com": "analytics"
+    }},
+    { "name": "Integral Ad Science", "domains": {
+      "adsafeprotected.com": "ad_verification"
+    }},
+    { "name": "DoubleVerify", "domains": {
+      "doubleverify.com": "ad_verification"
+    }},
+    { "name": "Contentsquare", "domains": {
+      "hotjar.com": "session_recording",
+      "hotjar.io": "session_recording",
+      "contentsquare.net": "session_recording"
+    }},
+    { "name": "FullStory", "domains": {
+      "fullstory.com": "session_recording"
+    }},
+    { "name": "Mouseflow", "domains": {
+      "mouseflow.com": "session_recording"
+    }},
+    { "name": "Crazy Egg", "domains": {
+      "crazyegg.com": "session_recording"
+    }},
+    { "name": "Twilio Segment", "domains": {
+      "segment.com": "customer_data",
+      "segment.io": "customer_data"
+    }},
+    { "name": "Mixpanel", "domains": {
+      "mixpanel.com": "analytics"
+    }},
+    { "name": "Amplitude", "domains": {
+      "amplitude.com": "analytics"
+    }},
+    { "name": "Heap", "domains": {
+      "heapanalytics.com": "analytics"
+    }},
+    { "name": "Optimizely", "domains": {
+      "optimizely.com": "analytics"
+    }},
+    { "name": "Chartbeat", "domains": {
+      "chartbeat.com": "analytics",
+      "chartbeat.net": "analytics"
+    }},
+    { "name": "New Relic", "domains": {
+      "nr-data.net": "analytics"
+    }},
+    { "name": "HubSpot", "domains": {
+      "hubspot.com": "customer_data",
+      "hs-analytics.net": "analytics"
+    }},
+    { "name": "Klaviyo", "domains": {
+      "klaviyo.com": "customer_data"
+    }},
+    { "name": "Intercom", "domains": {
+      "intercom.io": "customer_data"
+    }}
+  ]
+}

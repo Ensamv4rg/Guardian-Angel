@@ -1,0 +1,16 @@
+[package]
+name = "ga-report"
+description = "Builds the company-centric exposure report"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ga-core.workspace = true
+ga-knowledge.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

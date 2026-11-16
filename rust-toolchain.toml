@@ -1,0 +1,5 @@
+# Pins this project to stable Rust on the MSVC target, regardless of the
+# machine's global rustup default.
+[toolchain]
+channel = "stable"
+components = ["clippy", "rustfmt"]
