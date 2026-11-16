@@ -6,11 +6,11 @@
 #               attached to the run as an artifact and no release is created.
 # A tag with a dash (v0.2.0-beta.1) is published as a pre-release.
 #
-# Updates: with the repository secrets TAURI_SIGNING_PRIVATE_KEY,
-# TAURI_SIGNING_PRIVATE_KEY_PASSWORD and GA_UPDATER_PUBKEY set, the installer
-# is signed and latest.json is published, which installed copies check to
-# update themselves. Without them the release works but cannot be installed
-# as an update.
+# Updates: with the repository secret TAURI_SIGNING_PRIVATE_KEY set (and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD if the key has one), the installer is
+# signed and latest.json is published, which installed copies check to
+# update themselves. Without it the release works but is not offered as an
+# update.
 
 name: Release
 
@@ -65,7 +65,6 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          GA_UPDATER_PUBKEY: ${{ secrets.GA_UPDATER_PUBKEY }}
         run: ./scripts/build-installer.ps1
 
       - name: Name the installer
@@ -92,7 +91,7 @@ jobs:
             } | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8NoBOM latest.json
             "manifest=latest.json" >> $env:GITHUB_OUTPUT
           } else {
-            Write-Host "::warning::No updater signature: set the signing secrets so installed copies can update to this release."
+            Write-Host "::warning::No updater signature: set the TAURI_SIGNING_PRIVATE_KEY secret so installed copies can update to this release."
           }
 
       - uses: actions/upload-artifact@v4

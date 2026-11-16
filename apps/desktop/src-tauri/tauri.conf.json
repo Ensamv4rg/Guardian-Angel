@@ -38,7 +38,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ4ODA4RDJERDNGQjg3NkIKUldScmgvdlRMWTJBMk5NUFJUWGVSWHVWRzI3R2tqUEtNSmhWN2h3ME9lbTVCem5FUTdRSHlQUXcK",
       "endpoints": ["https://github.com/Ensamv4rg/Guardian-Angel/releases/latest/download/latest.json"],
       "windows": { "installMode": "passive" }
     }

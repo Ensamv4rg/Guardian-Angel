@@ -91,20 +91,13 @@ The installer appears on the Releases page about 20 minutes later. The workflow 
 
 ### Automatic updates
 
-Installed copies check `latest.json` on the newest (non-pre-release) GitHub Release when they open and every six hours, and offer "Update now". The update is a signed installer: the app refuses one not signed with the project's key. Set this up once:
+Installed copies check `latest.json` on the newest (non-pre-release) GitHub Release when they open and every six hours, and offer "Update now". The update is a signed installer: the app refuses one not signed with the project's key.
 
-1. Create the key pair (choose a password, or leave it empty):
-   ```
-   cd apps\desktop
-   pnpm tauri signer generate -w "$env:USERPROFILE\.tauri\guardian-angel.key"
-   ```
-2. In the repository's **Settings > Secrets and variables > Actions**, add:
-   - `TAURI_SIGNING_PRIVATE_KEY`: the contents of `guardian-angel.key`
-   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password (leave the secret empty if none)
-   - `GA_UPDATER_PUBKEY`: the contents of `guardian-angel.key.pub`
-3. Keep the private key safe. If it is lost, installed copies can no longer be updated and users must reinstall once.
+The key pair lives in `%USERPROFILE%\.tauri\guardian-angel.key` (private, no password) and `.key.pub`. The public half is in `tauri.conf.json` (`plugins.updater.pubkey`). The private half is the repository secret `TAURI_SIGNING_PRIVATE_KEY` (**Settings > Secrets and variables > Actions**), so the release workflow can sign.
 
-Releases built without these secrets still install, but cannot update themselves and are not offered as updates. Updates download from GitHub without signing in, so they only work once the repository (or a separate releases repository) is public.
+Keep a backup of the private key somewhere safe outside this PC. If it is lost, installed copies can no longer be updated and users must reinstall once with a new key.
+
+A release built without the secret still installs, but is not offered as an update. Updates download from GitHub without signing in, so they only work once the repository (or a separate releases repository) is public.
 
 ### Tracker list
 
