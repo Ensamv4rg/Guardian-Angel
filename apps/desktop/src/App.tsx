@@ -2,6 +2,7 @@ import { type ReactElement, useCallback, useEffect, useState } from "react";
 import { call, errorText } from "./api";
 import { ScanProgressBar } from "./components";
 import type { Overview } from "./types";
+import { UpdateBanner, UpdateFooter, useUpdates } from "./updates";
 import logo from "../src-tauri/icons/128x128.png";
 import OverviewPage from "./pages/Overview";
 import TrackersPage from "./pages/Trackers";
@@ -30,6 +31,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("overview");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const updates = useUpdates();
 
   const refresh = useCallback(async () => {
     try {
@@ -78,7 +80,10 @@ export default function App() {
             ))}
           </div>
         ))}
-        <div className="foot">Everything is analysed on this computer. Nothing is sent anywhere.</div>
+        <div className="foot">
+          Your data is analysed on this computer and never leaves it.
+          <UpdateFooter updates={updates} />
+        </div>
       </nav>
       <main>
         {error && (
@@ -86,6 +91,7 @@ export default function App() {
             {error} Start it with <span className="mono">guardian-service console</span> (development) or install the service.
           </div>
         )}
+        <UpdateBanner updates={updates} />
         {overview?.progress && <ScanProgressBar progress={overview.progress} />}
         {pages[page]}
       </main>

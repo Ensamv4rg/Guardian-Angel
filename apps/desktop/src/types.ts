@@ -80,8 +80,15 @@ export interface InstalledApp {
   install_dir: string;
   electron: boolean;
   findings: AppFinding[];
+  bytes_scanned: number;
   truncated: boolean;
+  skipped: SkippedFile[];
+  skipped_count: number;
+  skipped_bytes: number;
+  too_many_files: boolean;
+  full_scan: boolean;
 }
+export interface SkippedFile { path: string; size: number; reason: "too_large" | "app_limit" | "partly_read" }
 export interface AppScan { apps: InstalledApp[] }
 
 export interface CompanyContacts { company: string; categories: string[]; lookups: number; domains: string[]; processes: string[] }

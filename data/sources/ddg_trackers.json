@@ -1,0 +1,2004 @@
+{
+  "built_with": {
+    "tracker-radar": "9ce6785f8b474c0d182c2f4cc5064288ab30615663a1c33a411894b011a0b470-6253f5a053513120c61ad8221dc30a0e2cdbfeb9",
+    "tracker-surrogates": "2575c6e058fb02420399fe459418319af2fb93a7"
+  },
+  "companies": [
+    {
+      "domains": {
+        "33across.com": "advertising",
+        "tynt.com": "advertising"
+      },
+      "name": "33Across"
+    },
+    {
+      "domains": {
+        "securedvisit.com": "advertising"
+      },
+      "name": "4Cite Marketing"
+    },
+    {
+      "domains": {
+        "adotmob.com": "advertising"
+      },
+      "name": "A.Mob"
+    },
+    {
+      "domains": {
+        "abtasty.com": "session_recording"
+      },
+      "name": "AB Tasty"
+    },
+    {
+      "domains": {
+        "admanmedia.com": "analytics"
+      },
+      "name": "ADman Media"
+    },
+    {
+      "domains": {
+        "alcmpn.com": "advertising",
+        "bluecava.com": "advertising"
+      },
+      "name": "ALC"
+    },
+    {
+      "domains": {
+        "aniview.com": "analytics"
+      },
+      "name": "ANIVIEW"
+    },
+    {
+      "domains": {
+        "app-us1.com": "analytics"
+      },
+      "name": "ActiveCampaign"
+    },
+    {
+      "domains": {
+        "acuityplatform.com": "advertising"
+      },
+      "name": "AcuityAds"
+    },
+    {
+      "domains": {
+        "ad-company.site": "analytics"
+      },
+      "name": "Ad Company"
+    },
+    {
+      "domains": {
+        "ad-company.example": "analytics"
+      },
+      "name": "Ad Company Example"
+    },
+    {
+      "domains": {
+        "adlightning.com": "advertising"
+      },
+      "name": "Ad Lightning"
+    },
+    {
+      "domains": {
+        "adgrx.com": "advertising"
+      },
+      "name": "AdGear"
+    },
+    {
+      "domains": {
+        "adroll.com": "advertising"
+      },
+      "name": "AdRoll"
+    },
+    {
+      "domains": {
+        "adtarget.com.tr": "analytics"
+      },
+      "name": "AdTarget Medya A.Ş."
+    },
+    {
+      "domains": {
+        "adentifi.com": "advertising"
+      },
+      "name": "AdTheorent"
+    },
+    {
+      "domains": {
+        "adthrive.com": "advertising"
+      },
+      "name": "AdThrive"
+    },
+    {
+      "domains": {
+        "4dex.io": "analytics"
+      },
+      "name": "Adagio"
+    },
+    {
+      "domains": {
+        "shop.pe": "analytics"
+      },
+      "name": "Add Shoppers"
+    },
+    {
+      "domains": {
+        "addtoany.com": "advertising"
+      },
+      "name": "AddToAny"
+    },
+    {
+      "domains": {
+        "ipredictive.com": "advertising"
+      },
+      "name": "Adelphic"
+    },
+    {
+      "domains": {
+        "adform.net": "advertising"
+      },
+      "name": "Adform"
+    },
+    {
+      "domains": {
+        "adkernel.com": "advertising"
+      },
+      "name": "Adkernel"
+    },
+    {
+      "domains": {
+        "admedo.com": "advertising"
+      },
+      "name": "Admedo"
+    },
+    {
+      "domains": {
+        "admixer.net": "advertising"
+      },
+      "name": "Admixer"
+    },
+    {
+      "domains": {
+        "adnami.io": "analytics"
+      },
+      "name": "Adnami"
+    },
+    {
+      "domains": {
+        "adobedc.net": "analytics",
+        "everestjs.net": "advertising",
+        "marketo.com": "advertising",
+        "marketo.net": "advertising",
+        "mktoresp.com": "advertising"
+      },
+      "name": "Adobe"
+    },
+    {
+      "domains": {
+        "adsco.re": "advertising"
+      },
+      "name": "Adscore"
+    },
+    {
+      "domains": {
+        "adtelligent.com": "analytics"
+      },
+      "name": "Adtelligent"
+    },
+    {
+      "domains": {
+        "omnitagjs.com": "advertising"
+      },
+      "name": "Adyoulike"
+    },
+    {
+      "domains": {
+        "ahrefs.com": "analytics"
+      },
+      "name": "Ahrefs"
+    },
+    {
+      "domains": {
+        "aidata.io": "advertising"
+      },
+      "name": "Aidata"
+    },
+    {
+      "domains": {
+        "go-mpulse.net": "analytics"
+      },
+      "name": "Akamai"
+    },
+    {
+      "domains": {
+        "intentiq.com": "advertising",
+        "pro-market.net": "advertising"
+      },
+      "name": "Almondnet Group"
+    },
+    {
+      "domains": {
+        "amazon.com": "advertising"
+      },
+      "name": "Amazon"
+    },
+    {
+      "domains": {
+        "turn.com": "advertising"
+      },
+      "name": "Amobee"
+    },
+    {
+      "domains": {
+        "applovin.com": "analytics"
+      },
+      "name": "AppLovin"
+    },
+    {
+      "domains": {
+        "appier.net": "advertising"
+      },
+      "name": "Appier"
+    },
+    {
+      "domains": {
+        "ay.delivery": "analytics"
+      },
+      "name": "Assertive Yield"
+    },
+    {
+      "domains": {
+        "attn.tv": "advertising"
+      },
+      "name": "Attentive Mobile"
+    },
+    {
+      "domains": {
+        "ad.gt": "analytics"
+      },
+      "name": "Audigent"
+    },
+    {
+      "domains": {
+        "audioeye.com": "analytics"
+      },
+      "name": "AudioEye"
+    },
+    {
+      "domains": {
+        "dwin1.com": "advertising"
+      },
+      "name": "Awin"
+    },
+    {
+      "domains": {
+        "contentabc.com": "advertising"
+      },
+      "name": "Aylo"
+    },
+    {
+      "domains": {
+        "mediago.io": "analytics"
+      },
+      "name": "Baidu"
+    },
+    {
+      "domains": {
+        "bfmio.com": "advertising"
+      },
+      "name": "Beachfront Media"
+    },
+    {
+      "domains": {
+        "bidr.io": "advertising"
+      },
+      "name": "Beeswax"
+    },
+    {
+      "domains": {
+        "bidtheatre.com": "analytics"
+      },
+      "name": "BidTheatre"
+    },
+    {
+      "domains": {
+        "bttrack.com": "advertising"
+      },
+      "name": "Bidtellect"
+    },
+    {
+      "domains": {
+        "blismedia.com": "advertising"
+      },
+      "name": "Blis"
+    },
+    {
+      "domains": {
+        "btloader.com": "analytics"
+      },
+      "name": "Blockthrough"
+    },
+    {
+      "domains": {
+        "blueconic.net": "advertising"
+      },
+      "name": "BlueConic"
+    },
+    {
+      "domains": {
+        "ml314.com": "session_recording"
+      },
+      "name": "Bombora"
+    },
+    {
+      "domains": {
+        "bounceexchange.com": "advertising"
+      },
+      "name": "Bounce Exchange"
+    },
+    {
+      "domains": {
+        "branch.io": "advertising"
+      },
+      "name": "Branch Metrics"
+    },
+    {
+      "domains": {
+        "brandmetrics.com": "analytics"
+      },
+      "name": "Brandmetrics"
+    },
+    {
+      "domains": {
+        "appboycdn.com": "analytics"
+      },
+      "name": "Braze"
+    },
+    {
+      "domains": {
+        "bc0a.com": "analytics"
+      },
+      "name": "BrightEdge"
+    },
+    {
+      "domains": {
+        "loopme.me": "advertising",
+        "marphezis.com": "analytics"
+      },
+      "name": "Brightcom"
+    },
+    {
+      "domains": {
+        "browsiprod.com": "analytics"
+      },
+      "name": "Browsi Mobile LLC"
+    },
+    {
+      "domains": {
+        "uncn.jp": "advertising"
+      },
+      "name": "Bulbit"
+    },
+    {
+      "domains": {
+        "tiktokw.us": "analytics"
+      },
+      "name": "ByteDance"
+    },
+    {
+      "domains": {
+        "cdnwidget.com": "analytics"
+      },
+      "name": "CDNWIDGET.COM"
+    },
+    {
+      "domains": {
+        "sail-horizon.com": "advertising"
+      },
+      "name": "CM Group"
+    },
+    {
+      "domains": {
+        "callrail.com": "analytics"
+      },
+      "name": "CallRail"
+    },
+    {
+      "domains": {
+        "basis.net": "advertising",
+        "sitescout.com": "advertising"
+      },
+      "name": "Centro"
+    },
+    {
+      "domains": {
+        "chaturbate.com": "advertising"
+      },
+      "name": "Chaturbate"
+    },
+    {
+      "domains": {
+        "trkn.us": "analytics"
+      },
+      "name": "Claritas"
+    },
+    {
+      "domains": {
+        "clickagy.com": "advertising"
+      },
+      "name": "Clickagy"
+    },
+    {
+      "domains": {
+        "ccgateway.net": "analytics"
+      },
+      "name": "Clicksco FZ"
+    },
+    {
+      "domains": {
+        "cloudflareinsights.com": "analytics"
+      },
+      "name": "Cloudflare"
+    },
+    {
+      "domains": {
+        "cognitivlabs.com": "analytics"
+      },
+      "name": "Cognitiv"
+    },
+    {
+      "domains": {
+        "stackadapt.com": "advertising"
+      },
+      "name": "Collective Roll"
+    },
+    {
+      "domains": {
+        "confiant-integrations.net": "analytics"
+      },
+      "name": "Confiant"
+    },
+    {
+      "domains": {
+        "connatix.com": "analytics"
+      },
+      "name": "Connatix"
+    },
+    {
+      "domains": {
+        "connectad.io": "analytics"
+      },
+      "name": "ConnectAd"
+    },
+    {
+      "domains": {
+        "serverbid.com": "analytics"
+      },
+      "name": "Consumable"
+    },
+    {
+      "domains": {
+        "dotomi.com": "advertising",
+        "fastclick.net": "analytics",
+        "mczbf.com": "analytics"
+      },
+      "name": "Conversant"
+    },
+    {
+      "domains": {
+        "convertexperiments.com": "analytics"
+      },
+      "name": "Convert Insights"
+    },
+    {
+      "domains": {
+        "ctnsnet.com": "advertising"
+      },
+      "name": "Crimtan Holdings"
+    },
+    {
+      "domains": {
+        "mfadsrvr.com": "advertising"
+      },
+      "name": "Criteo"
+    },
+    {
+      "domains": {
+        "dtscout.com": "advertising"
+      },
+      "name": "DTS"
+    },
+    {
+      "domains": {
+        "tvpixel.com": "advertising"
+      },
+      "name": "Data Plus Math"
+    },
+    {
+      "domains": {
+        "captcha-delivery.com": "analytics"
+      },
+      "name": "DataDome"
+    },
+    {
+      "domains": {
+        "datadoghq-browser-agent.com": "analytics"
+      },
+      "name": "Datadog"
+    },
+    {
+      "domains": {
+        "deepintent.com": "advertising"
+      },
+      "name": "DeepIntent"
+    },
+    {
+      "domains": {
+        "company-target.com": "advertising",
+        "demandbase.com": "advertising"
+      },
+      "name": "Demandbase"
+    },
+    {
+      "domains": {
+        "privacy-center.org": "analytics"
+      },
+      "name": "Didomi"
+    },
+    {
+      "domains": {
+        "disqus.com": "social"
+      },
+      "name": "Disqus"
+    },
+    {
+      "domains": {
+        "driftt.com": "analytics"
+      },
+      "name": "Drift.com"
+    },
+    {
+      "domains": {
+        "media6degrees.com": "advertising"
+      },
+      "name": "Dstillery"
+    },
+    {
+      "domains": {
+        "dynatrace.com": "analytics"
+      },
+      "name": "Dynatrace"
+    },
+    {
+      "domains": {
+        "yadro.ru": "advertising"
+      },
+      "name": "ECO PC - Complex Solutions"
+    },
+    {
+      "domains": {
+        "brealtime.com": "advertising"
+      },
+      "name": "EMX Digital"
+    },
+    {
+      "domains": {
+        "emxdgt.com": "advertising"
+      },
+      "name": "Engine USA"
+    },
+    {
+      "domains": {
+        "ensighten.com": "advertising"
+      },
+      "name": "Ensighten"
+    },
+    {
+      "domains": {
+        "sascdn.com": "advertising"
+      },
+      "name": "Equativ"
+    },
+    {
+      "domains": {
+        "exdynsrv.com": "advertising",
+        "exoclick.com": "advertising",
+        "exosrv.com": "advertising",
+        "realsrv.com": "advertising"
+      },
+      "name": "ExoClick"
+    },
+    {
+      "domains": {
+        "exponential.com": "session_recording",
+        "tribalfusion.com": "advertising"
+      },
+      "name": "Exponential Interactive"
+    },
+    {
+      "domains": {
+        "ezodn.com": "analytics",
+        "ezoic.net": "session_recording"
+      },
+      "name": "Ezoic"
+    },
+    {
+      "domains": {
+        "geoedge.be": "analytics"
+      },
+      "name": "Five Media"
+    },
+    {
+      "domains": {
+        "foresee.com": "session_recording"
+      },
+      "name": "ForeSee Results"
+    },
+    {
+      "domains": {
+        "fwmrm.net": "advertising"
+      },
+      "name": "FreeWheel"
+    },
+    {
+      "domains": {
+        "pub.network": "analytics",
+        "t13.io": "analytics"
+      },
+      "name": "Freestar"
+    },
+    {
+      "domains": {
+        "gemius.pl": "advertising"
+      },
+      "name": "Gemius"
+    },
+    {
+      "domains": {
+        "adhigh.net": "advertising"
+      },
+      "name": "GetIntent"
+    },
+    {
+      "domains": {
+        "getsitecontrol.com": "advertising"
+      },
+      "name": "GetWebCraft"
+    },
+    {
+      "domains": {
+        "adtrafficquality.google": "analytics"
+      },
+      "name": "Google"
+    },
+    {
+      "domains": {
+        "hs-banner.com": "analytics",
+        "hsadspixel.net": "advertising",
+        "hsappstatic.net": "analytics"
+      },
+      "name": "HubSpot"
+    },
+    {
+      "domains": {
+        "script.ac": "analytics"
+      },
+      "name": "Human Security"
+    },
+    {
+      "domains": {
+        "hybrid.ai": "advertising"
+      },
+      "name": "Hybrid Adtech"
+    },
+    {
+      "domains": {
+        "ioam.de": "analytics"
+      },
+      "name": "INFOnline"
+    },
+    {
+      "domains": {
+        "impactcdn.com": "analytics",
+        "impactradius-event.com": "advertising",
+        "pxf.io": "analytics",
+        "sjv.io": "analytics"
+      },
+      "name": "Impact"
+    },
+    {
+      "domains": {
+        "360yield.com": "advertising"
+      },
+      "name": "Improve Digital"
+    },
+    {
+      "domains": {
+        "inmobi.com": "analytics"
+      },
+      "name": "InMobi"
+    },
+    {
+      "domains": {
+        "infolinks.com": "analytics"
+      },
+      "name": "Infolink Media"
+    },
+    {
+      "domains": {
+        "ingage.tech": "analytics"
+      },
+      "name": "Insticator"
+    },
+    {
+      "domains": {
+        "intergi.com": "analytics",
+        "intergient.com": "analytics",
+        "playwire.com": "analytics"
+      },
+      "name": "Intergi Entertainment"
+    },
+    {
+      "domains": {
+        "im-apps.net": "analytics"
+      },
+      "name": "Intimate Merger"
+    },
+    {
+      "domains": {
+        "intuit.com": "analytics",
+        "list-manage.com": "analytics",
+        "mailchimp.com": "advertising"
+      },
+      "name": "Intuit"
+    },
+    {
+      "domains": {
+        "invocacdn.com": "analytics"
+      },
+      "name": "Invoca"
+    },
+    {
+      "domains": {
+        "ivitrack.com": "advertising"
+      },
+      "name": "Ividence"
+    },
+    {
+      "domains": {
+        "juicyads.com": "advertising"
+      },
+      "name": "JuicyAds"
+    },
+    {
+      "domains": {
+        "kargo.com": "advertising"
+      },
+      "name": "Kargo"
+    },
+    {
+      "domains": {
+        "ketchcdn.com": "analytics"
+      },
+      "name": "Ketch"
+    },
+    {
+      "domains": {
+        "kit.com": "analytics"
+      },
+      "name": "Kit"
+    },
+    {
+      "domains": {
+        "yahoo.co.jp": "advertising",
+        "yimg.jp": "advertising"
+      },
+      "name": "LY-Corporation"
+    },
+    {
+      "domains": {
+        "trueleadid.com": "advertising"
+      },
+      "name": "Lead Intelligence"
+    },
+    {
+      "domains": {
+        "listrakbi.com": "advertising"
+      },
+      "name": "Listrak"
+    },
+    {
+      "domains": {
+        "liadm.com": "advertising"
+      },
+      "name": "LiveIntent"
+    },
+    {
+      "domains": {
+        "liveperson.net": "advertising",
+        "lpsnmedia.net": "advertising"
+      },
+      "name": "LivePerson"
+    },
+    {
+      "domains": {
+        "pippio.com": "advertising"
+      },
+      "name": "LiveRamp"
+    },
+    {
+      "domains": {
+        "samplicio.us": "advertising"
+      },
+      "name": "Lucid Holdings"
+    },
+    {
+      "domains": {
+        "mgid.com": "advertising"
+      },
+      "name": "MGID"
+    },
+    {
+      "domains": {
+        "mailerlite.com": "analytics"
+      },
+      "name": "MailerLite"
+    },
+    {
+      "domains": {
+        "mrf.io": "analytics"
+      },
+      "name": "Marfeel"
+    },
+    {
+      "domains": {
+        "maxmind.com": "advertising"
+      },
+      "name": "MaxMind"
+    },
+    {
+      "domains": {
+        "primis.tech": "analytics"
+      },
+      "name": "McCann"
+    },
+    {
+      "domains": {
+        "medallia.com": "analytics"
+      },
+      "name": "Medallia"
+    },
+    {
+      "domains": {
+        "mathtag.com": "advertising"
+      },
+      "name": "MediaMath"
+    },
+    {
+      "domains": {
+        "flashtalking.com": "session_recording",
+        "ftstatic.com": "analytics"
+      },
+      "name": "Mediaocean"
+    },
+    {
+      "domains": {
+        "grow.me": "analytics",
+        "mediavine.com": "advertising"
+      },
+      "name": "Mediavine"
+    },
+    {
+      "domains": {
+        "rkdms.com": "advertising"
+      },
+      "name": "Merkle"
+    },
+    {
+      "domains": {
+        "microad.jp": "advertising"
+      },
+      "name": "MicroAd"
+    },
+    {
+      "domains": {
+        "mxpnl.com": "session_recording"
+      },
+      "name": "Mixpanel"
+    },
+    {
+      "domains": {
+        "moloco.com": "analytics"
+      },
+      "name": "Moloco"
+    },
+    {
+      "domains": {
+        "usabilla.com": "advertising"
+      },
+      "name": "Momentive"
+    },
+    {
+      "domains": {
+        "a-mo.net": "analytics"
+      },
+      "name": "Monet Engine"
+    },
+    {
+      "domains": {
+        "monetate.net": "advertising"
+      },
+      "name": "Monetate"
+    },
+    {
+      "domains": {
+        "monsido.com": "analytics"
+      },
+      "name": "Monsido"
+    },
+    {
+      "domains": {
+        "mountain.com": "analytics"
+      },
+      "name": "Mountain Digital"
+    },
+    {
+      "domains": {
+        "micpn.com": "advertising"
+      },
+      "name": "Movable Ink"
+    },
+    {
+      "domains": {
+        "ntv.io": "advertising",
+        "postrelease.com": "advertising"
+      },
+      "name": "Nativo"
+    },
+    {
+      "domains": {
+        "zprk.io": "analytics"
+      },
+      "name": "Near"
+    },
+    {
+      "domains": {
+        "newrelic.com": "analytics"
+      },
+      "name": "New Relic"
+    },
+    {
+      "domains": {
+        "nextmillmedia.com": "analytics"
+      },
+      "name": "Next Millennium"
+    },
+    {
+      "domains": {
+        "nextdoor.com": "analytics"
+      },
+      "name": "Nextdoor"
+    },
+    {
+      "domains": {
+        "presage.io": "analytics"
+      },
+      "name": "Ogury"
+    },
+    {
+      "domains": {
+        "onesignal.com": "advertising"
+      },
+      "name": "OneSignal"
+    },
+    {
+      "domains": {
+        "onetag-sys.com": "analytics"
+      },
+      "name": "OneTag"
+    },
+    {
+      "domains": {
+        "pubnation.com": "advertising"
+      },
+      "name": "OpenX"
+    },
+    {
+      "domains": {
+        "opera.com": "analytics"
+      },
+      "name": "Opera Software"
+    },
+    {
+      "domains": {
+        "optidigital.com": "analytics"
+      },
+      "name": "Opti Digital"
+    },
+    {
+      "domains": {
+        "eloqua.com": "advertising",
+        "en25.com": "advertising"
+      },
+      "name": "Oracle"
+    },
+    {
+      "domains": {
+        "osano.com": "analytics"
+      },
+      "name": "Osano"
+    },
+    {
+      "domains": {
+        "outbrainimg.com": "analytics",
+        "zemanta.com": "advertising"
+      },
+      "name": "Outbrain"
+    },
+    {
+      "domains": {
+        "parsely.com": "advertising"
+      },
+      "name": "Parsely"
+    },
+    {
+      "domains": {
+        "paypal.com": "analytics"
+      },
+      "name": "PayPal"
+    },
+    {
+      "domains": {
+        "permutive.app": "analytics",
+        "permutive.com": "session_recording"
+      },
+      "name": "Permutive"
+    },
+    {
+      "domains": {
+        "cxense.com": "advertising",
+        "npttech.com": "advertising",
+        "tinypass.com": "advertising"
+      },
+      "name": "Piano Software"
+    },
+    {
+      "domains": {
+        "temu.com": "analytics"
+      },
+      "name": "Pinduoduo"
+    },
+    {
+      "domains": {
+        "pingdom.net": "advertising"
+      },
+      "name": "Pingdom"
+    },
+    {
+      "domains": {
+        "creative-serving.com": "advertising"
+      },
+      "name": "Platform161"
+    },
+    {
+      "domains": {
+        "servenobid.com": "analytics"
+      },
+      "name": "Prebid.org"
+    },
+    {
+      "domains": {
+        "pbstck.com": "analytics"
+      },
+      "name": "Pubstack"
+    },
+    {
+      "domains": {
+        "contextweb.com": "advertising"
+      },
+      "name": "Pulsepoint"
+    },
+    {
+      "domains": {
+        "p-n.io": "analytics"
+      },
+      "name": "Pushly"
+    },
+    {
+      "domains": {
+        "qualaroo.com": "session_recording"
+      },
+      "name": "Qualaroo"
+    },
+    {
+      "domains": {
+        "quantummetric.com": "analytics"
+      },
+      "name": "Quantum Metric"
+    },
+    {
+      "domains": {
+        "creativecdn.com": "advertising"
+      },
+      "name": "RTB House"
+    },
+    {
+      "domains": {
+        "linksynergy.com": "advertising",
+        "rakuten.com": "analytics",
+        "rmtag.com": "advertising"
+      },
+      "name": "Rakuten"
+    },
+    {
+      "domains": {
+        "rambler.ru": "advertising"
+      },
+      "name": "Rambler Internet Holding"
+    },
+    {
+      "domains": {
+        "redditstatic.com": "advertising"
+      },
+      "name": "Reddit"
+    },
+    {
+      "domains": {
+        "resetdigital.co": "analytics"
+      },
+      "name": "Reset Digital"
+    },
+    {
+      "domains": {
+        "reson8.com": "advertising"
+      },
+      "name": "Resonate Networks"
+    },
+    {
+      "domains": {
+        "omappapi.com": "analytics",
+        "opmnstr.com": "advertising",
+        "optmnstr.com": "advertising"
+      },
+      "name": "Retyp"
+    },
+    {
+      "domains": {
+        "revcontent.com": "advertising"
+      },
+      "name": "RevContent"
+    },
+    {
+      "domains": {
+        "1rx.io": "advertising"
+      },
+      "name": "RhythmOne"
+    },
+    {
+      "domains": {
+        "richaudience.com": "analytics"
+      },
+      "name": "Rich Audience"
+    },
+    {
+      "domains": {
+        "getrockerbox.com": "analytics"
+      },
+      "name": "Rockerbox"
+    },
+    {
+      "domains": {
+        "rqtrk.eu": "advertising"
+      },
+      "name": "Roq.ad"
+    },
+    {
+      "domains": {
+        "getclicky.com": "ad_verification"
+      },
+      "name": "Roxr Software"
+    },
+    {
+      "domains": {
+        "seedtag.com": "analytics"
+      },
+      "name": "SEEDTAG ADVERTISING"
+    },
+    {
+      "domains": {
+        "betweendigital.com": "advertising"
+      },
+      "name": "SSP Network"
+    },
+    {
+      "domains": {
+        "cquotient.com": "analytics",
+        "evergage.com": "analytics",
+        "evgnet.com": "analytics",
+        "igodigital.com": "advertising",
+        "pardot.com": "advertising"
+      },
+      "name": "Salesforce"
+    },
+    {
+      "domains": {
+        "semasio.net": "advertising"
+      },
+      "name": "Semasio"
+    },
+    {
+      "domains": {
+        "sharethis.com": "advertising"
+      },
+      "name": "ShareThis"
+    },
+    {
+      "domains": {
+        "shop.app": "analytics"
+      },
+      "name": "Shopify"
+    },
+    {
+      "domains": {
+        "qualtrics.com": "session_recording"
+      },
+      "name": "Silver Lake"
+    },
+    {
+      "domains": {
+        "simpli.fi": "advertising"
+      },
+      "name": "Simplifi Holdings"
+    },
+    {
+      "domains": {
+        "siteimprove.com": "analytics",
+        "siteimproveanalytics.com": "analytics"
+      },
+      "name": "Siteimprove"
+    },
+    {
+      "domains": {
+        "skimresources.com": "advertising"
+      },
+      "name": "Skimbit"
+    },
+    {
+      "domains": {
+        "smaato.net": "advertising"
+      },
+      "name": "Smaato"
+    },
+    {
+      "domains": {
+        "ladsp.com": "advertising"
+      },
+      "name": "So-net Media Networks"
+    },
+    {
+      "domains": {
+        "sojern.com": "advertising"
+      },
+      "name": "Sojern"
+    },
+    {
+      "domains": {
+        "sonobi.com": "advertising"
+      },
+      "name": "Sonobi"
+    },
+    {
+      "domains": {
+        "sportradarserving.com": "analytics"
+      },
+      "name": "Sportradar"
+    },
+    {
+      "domains": {
+        "springserve.com": "advertising"
+      },
+      "name": "SpringServe"
+    },
+    {
+      "domains": {
+        "statcounter.com": "analytics"
+      },
+      "name": "StatCounter"
+    },
+    {
+      "domains": {
+        "storygize.net": "advertising"
+      },
+      "name": "Storygize"
+    },
+    {
+      "domains": {
+        "sundaysky.com": "advertising"
+      },
+      "name": "SundaySky"
+    },
+    {
+      "domains": {
+        "socdm.com": "advertising"
+      },
+      "name": "Supership"
+    },
+    {
+      "domains": {
+        "technoratimedia.com": "advertising"
+      },
+      "name": "Synacor"
+    },
+    {
+      "domains": {
+        "bizrate.com": "advertising"
+      },
+      "name": "Synapse Group"
+    },
+    {
+      "domains": {
+        "tvsquared.com": "advertising"
+      },
+      "name": "TVSquared"
+    },
+    {
+      "domains": {
+        "tappx.com": "analytics"
+      },
+      "name": "Tappx"
+    },
+    {
+      "domains": {
+        "teads.tv": "advertising"
+      },
+      "name": "Teads"
+    },
+    {
+      "domains": {
+        "tealiumiq.com": "session_recording",
+        "tiqcdn.com": "advertising"
+      },
+      "name": "Tealium"
+    },
+    {
+      "domains": {
+        "tremorhub.com": "advertising"
+      },
+      "name": "Telaria"
+    },
+    {
+      "domains": {
+        "e-planning.net": "advertising"
+      },
+      "name": "Teroa"
+    },
+    {
+      "domains": {
+        "bad.third-party.site": "analytics"
+      },
+      "name": "Test Site for Tracker Blocking"
+    },
+    {
+      "domains": {
+        "webcontentassessor.com": "analytics"
+      },
+      "name": "The Media Trust"
+    },
+    {
+      "domains": {
+        "exelator.com": "advertising",
+        "imrworldwide.com": "advertising"
+      },
+      "name": "The Nielsen Company"
+    },
+    {
+      "domains": {
+        "the-ozone-project.com": "analytics"
+      },
+      "name": "The Ozone Project"
+    },
+    {
+      "domains": {
+        "uidapi.com": "analytics"
+      },
+      "name": "The Trade Desk"
+    },
+    {
+      "domains": {
+        "thrtle.com": "advertising"
+      },
+      "name": "Throtle"
+    },
+    {
+      "domains": {
+        "alocdn.com": "analytics"
+      },
+      "name": "TowerData"
+    },
+    {
+      "domains": {
+        "tsyndicate.com": "advertising"
+      },
+      "name": "Traffic Stars"
+    },
+    {
+      "domains": {
+        "treasuredata.com": "advertising"
+      },
+      "name": "Treasure Data"
+    },
+    {
+      "domains": {
+        "opecloud.com": "analytics"
+      },
+      "name": "TripleLift"
+    },
+    {
+      "domains": {
+        "trustpilot.com": "analytics"
+      },
+      "name": "Trustpilot"
+    },
+    {
+      "domains": {
+        "upsellit.com": "analytics"
+      },
+      "name": "USI"
+    },
+    {
+      "domains": {
+        "undertone.com": "advertising"
+      },
+      "name": "Undertone Networks"
+    },
+    {
+      "domains": {
+        "yellowblue.io": "analytics"
+      },
+      "name": "Unity (ironSource)"
+    },
+    {
+      "domains": {
+        "unrulymedia.com": "advertising"
+      },
+      "name": "Unruly Group"
+    },
+    {
+      "domains": {
+        "mail.ru": "advertising",
+        "vk.com": "advertising"
+      },
+      "name": "VK"
+    },
+    {
+      "domains": {
+        "mxptint.net": "advertising"
+      },
+      "name": "Valassis Digital"
+    },
+    {
+      "domains": {
+        "cootlogix.com": "analytics"
+      },
+      "name": "Vidazoo"
+    },
+    {
+      "domains": {
+        "adition.com": "advertising",
+        "theadex.com": "advertising"
+      },
+      "name": "Virtual Minds"
+    },
+    {
+      "domains": {
+        "nytrng.com": "analytics"
+      },
+      "name": "Voltn"
+    },
+    {
+      "domains": {
+        "mookie1.com": "advertising"
+      },
+      "name": "WPP"
+    },
+    {
+      "domains": {
+        "wt-eu02.net": "advertising",
+        "wt-safetag.com": "advertising"
+      },
+      "name": "Webtrekk"
+    },
+    {
+      "domains": {
+        "visualwebsiteoptimizer.com": "session_recording"
+      },
+      "name": "Wingify"
+    },
+    {
+      "domains": {
+        "wp.pl": "analytics"
+      },
+      "name": "Wirtualna Polska"
+    },
+    {
+      "domains": {
+        "visx.net": "analytics"
+      },
+      "name": "YOC"
+    },
+    {
+      "domains": {
+        "webvisor.org": "session_recording",
+        "yads.tech": "analytics",
+        "yandexmetrica.com": "analytics",
+        "yango.com": "analytics",
+        "ymetrica1.com": "analytics"
+      },
+      "name": "Yandex"
+    },
+    {
+      "domains": {
+        "yieldmo.com": "advertising"
+      },
+      "name": "YieldMo"
+    },
+    {
+      "domains": {
+        "yotpo.com": "advertising"
+      },
+      "name": "Yotpo"
+    },
+    {
+      "domains": {
+        "zeotap.com": "analytics"
+      },
+      "name": "Zeotap"
+    },
+    {
+      "domains": {
+        "rezync.com": "advertising",
+        "rfihub.com": "advertising"
+      },
+      "name": "Zeta Global"
+    },
+    {
+      "domains": {
+        "zoominfo.com": "analytics"
+      },
+      "name": "Zoom Information"
+    },
+    {
+      "domains": {
+        "acsbapp.com": "analytics"
+      },
+      "name": "accessiBe"
+    },
+    {
+      "domains": {
+        "aditude.cloud": "analytics"
+      },
+      "name": "aditude.cloud"
+    },
+    {
+      "domains": {
+        "aditude.io": "analytics"
+      },
+      "name": "aditude.io"
+    },
+    {
+      "domains": {
+        "admaster.cc": "analytics"
+      },
+      "name": "admaster.cc"
+    },
+    {
+      "domains": {
+        "adtarget.biz": "analytics"
+      },
+      "name": "adtarget.biz"
+    },
+    {
+      "domains": {
+        "amspbs.com": "analytics"
+      },
+      "name": "amspbs.com"
+    },
+    {
+      "domains": {
+        "amx1.net": "analytics"
+      },
+      "name": "amx1.net"
+    },
+    {
+      "domains": {
+        "anonymised.io": "analytics"
+      },
+      "name": "anonymised.io"
+    },
+    {
+      "domains": {
+        "attntags.com": "analytics"
+      },
+      "name": "attntags.com"
+    },
+    {
+      "domains": {
+        "ck-ie.com": "analytics"
+      },
+      "name": "ck-ie.com"
+    },
+    {
+      "domains": {
+        "config-security.com": "analytics"
+      },
+      "name": "config-security.com"
+    },
+    {
+      "domains": {
+        "consentmo.com": "analytics"
+      },
+      "name": "consentmo.com"
+    },
+    {
+      "domains": {
+        "cookie-script.com": "analytics"
+      },
+      "name": "cookie-script.com"
+    },
+    {
+      "domains": {
+        "copper6.com": "analytics"
+      },
+      "name": "copper6.com"
+    },
+    {
+      "domains": {
+        "docaccess.com": "analytics"
+      },
+      "name": "docaccess.com"
+    },
+    {
+      "domains": {
+        "dv.tech": "analytics"
+      },
+      "name": "dv.tech"
+    },
+    {
+      "domains": {
+        "dxtech.ai": "analytics"
+      },
+      "name": "dxtech.ai"
+    },
+    {
+      "domains": {
+        "ebxcdn.com": "analytics"
+      },
+      "name": "ebxcdn.com"
+    },
+    {
+      "domains": {
+        "eskimi.com": "analytics"
+      },
+      "name": "eskimi.com"
+    },
+    {
+      "domains": {
+        "eyeota.net": "advertising"
+      },
+      "name": "eyeota"
+    },
+    {
+      "domains": {
+        "fsrv.io": "analytics"
+      },
+      "name": "fsrv.io"
+    },
+    {
+      "domains": {
+        "fuseplatform.net": "analytics"
+      },
+      "name": "fuseplatform.net"
+    },
+    {
+      "domains": {
+        "getelevar.com": "analytics"
+      },
+      "name": "getelevar.com"
+    },
+    {
+      "domains": {
+        "hlx.page": "analytics"
+      },
+      "name": "hlx.page"
+    },
+    {
+      "domains": {
+        "htlbid.com": "analytics"
+      },
+      "name": "htlbid.com"
+    },
+    {
+      "domains": {
+        "html-load.com": "analytics"
+      },
+      "name": "html-load.com"
+    },
+    {
+      "domains": {
+        "iperceptions.com": "analytics"
+      },
+      "name": "iPerceptions"
+    },
+    {
+      "domains": {
+        "ispot.tv": "advertising"
+      },
+      "name": "iSpot.tv"
+    },
+    {
+      "domains": {
+        "intelligems.io": "analytics"
+      },
+      "name": "intelligems.io"
+    },
+    {
+      "domains": {
+        "iqm.com": "analytics"
+      },
+      "name": "iqm.com"
+    },
+    {
+      "domains": {
+        "journeymv.com": "analytics"
+      },
+      "name": "journeymv.com"
+    },
+    {
+      "domains": {
+        "krushmedia.com": "analytics"
+      },
+      "name": "krushmedia.com"
+    },
+    {
+      "domains": {
+        "kueezrtb.com": "analytics"
+      },
+      "name": "kueezrtb.com"
+    },
+    {
+      "domains": {
+        "liftdsp.com": "analytics"
+      },
+      "name": "liftdsp.com"
+    },
+    {
+      "domains": {
+        "magsrv.com": "analytics"
+      },
+      "name": "magsrv.com"
+    },
+    {
+      "domains": {
+        "mantis-intelligence.com": "analytics"
+      },
+      "name": "mantis-intelligence.com"
+    },
+    {
+      "domains": {
+        "mediarithmics.com": "advertising"
+      },
+      "name": "mediarithmics"
+    },
+    {
+      "domains": {
+        "mgln.ai": "analytics"
+      },
+      "name": "mgln.ai"
+    },
+    {
+      "domains": {
+        "minutemedia-prebid.com": "analytics"
+      },
+      "name": "minutemedia-prebid.com"
+    },
+    {
+      "domains": {
+        "newsroom.bi": "analytics"
+      },
+      "name": "newsroom.bi"
+    },
+    {
+      "domains": {
+        "nexx360.io": "analytics"
+      },
+      "name": "nexx360.io"
+    },
+    {
+      "domains": {
+        "noibu.com": "analytics"
+      },
+      "name": "noibu.com"
+    },
+    {
+      "domains": {
+        "northbeam.io": "analytics"
+      },
+      "name": "northbeam.io"
+    },
+    {
+      "domains": {
+        "openwebmp.com": "analytics"
+      },
+      "name": "openwebmp.com"
+    },
+    {
+      "domains": {
+        "optable.co": "analytics"
+      },
+      "name": "optable.co"
+    },
+    {
+      "domains": {
+        "p7cloud.net": "analytics"
+      },
+      "name": "p7cloud.net"
+    },
+    {
+      "domains": {
+        "peer-39.com": "analytics"
+      },
+      "name": "peer-39.com"
+    },
+    {
+      "domains": {
+        "pemsrv.com": "analytics"
+      },
+      "name": "pemsrv.com"
+    },
+    {
+      "domains": {
+        "pixad.com.tr": "analytics"
+      },
+      "name": "pixad.com.tr"
+    },
+    {
+      "domains": {
+        "posthog.com": "analytics"
+      },
+      "name": "posthog.com"
+    },
+    {
+      "domains": {
+        "programmaticx.ai": "analytics"
+      },
+      "name": "programmaticx.ai"
+    },
+    {
+      "domains": {
+        "receptivity.io": "analytics"
+      },
+      "name": "receptivity.io"
+    },
+    {
+      "domains": {
+        "roeyecdn.com": "analytics"
+      },
+      "name": "roeyecdn.com"
+    },
+    {
+      "domains": {
+        "scriptwrapper.com": "analytics"
+      },
+      "name": "scriptwrapper.com"
+    },
+    {
+      "domains": {
+        "shb-sync.com": "analytics"
+      },
+      "name": "shb-sync.com"
+    },
+    {
+      "domains": {
+        "slickstream.com": "analytics"
+      },
+      "name": "slickstream.com"
+    },
+    {
+      "domains": {
+        "smilewanted.com": "analytics"
+      },
+      "name": "smilewanted.com"
+    },
+    {
+      "domains": {
+        "sparteo.com": "analytics"
+      },
+      "name": "sparteo.com"
+    },
+    {
+      "domains": {
+        "stape.io": "analytics"
+      },
+      "name": "stape.io"
+    },
+    {
+      "domains": {
+        "stay22.com": "analytics"
+      },
+      "name": "stay22.com"
+    },
+    {
+      "domains": {
+        "syncingbridge.com": "analytics"
+      },
+      "name": "syncingbridge.com"
+    },
+    {
+      "domains": {
+        "termly.io": "analytics"
+      },
+      "name": "termly.io"
+    },
+    {
+      "domains": {
+        "travelaudience.com": "analytics"
+      },
+      "name": "travelaudience.com"
+    },
+    {
+      "domains": {
+        "tru.am": "analytics"
+      },
+      "name": "trueAnthem"
+    },
+    {
+      "domains": {
+        "trustedstack.com": "analytics"
+      },
+      "name": "trustedstack.com"
+    },
+    {
+      "domains": {
+        "tvspix.com": "analytics"
+      },
+      "name": "tvspix.com"
+    },
+    {
+      "domains": {
+        "usbrowserspeed.com": "analytics"
+      },
+      "name": "usbrowserspeed.com"
+    },
+    {
+      "domains": {
+        "uuidksinc.net": "analytics"
+      },
+      "name": "uuidksinc.net"
+    },
+    {
+      "domains": {
+        "vibe.co": "analytics"
+      },
+      "name": "vibe.co"
+    },
+    {
+      "domains": {
+        "histats.com": "analytics"
+      },
+      "name": "wisecode"
+    },
+    {
+      "domains": {
+        "wknd.ai": "analytics"
+      },
+      "name": "wknd.ai"
+    },
+    {
+      "domains": {
+        "zi-scripts.com": "analytics"
+      },
+      "name": "zi-scripts.com"
+    }
+  ],
+  "license": "CC BY-NC-SA 4.0, https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "source": "DuckDuckGo Tracker Radar (tracker-blocklists, extension-tds v6)"
+}

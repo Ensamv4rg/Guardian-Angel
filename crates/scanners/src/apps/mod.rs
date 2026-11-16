@@ -11,7 +11,7 @@ mod inspect;
 pub mod inventory;
 pub mod matcher;
 
-pub use inspect::Limits;
+pub use inspect::{FileProgress, Limits};
 pub use inventory::{AppRoots, Candidate};
 
 use crate::windows_privacy::registry::Registry;
@@ -61,6 +61,25 @@ pub fn scan_apps_with_progress(
     }
 }
 
+/// Scans one app (every install of it, by name) with the given limits; used
+/// for "scan everything" on an app the normal scan only skimmed. `None` if
+/// no installed app has that name.
+pub fn scan_one_app(
+    reg: &dyn Registry,
+    roots: &AppRoots,
+    matcher: &Matcher,
+    name: &str,
+    limits: Limits,
+    progress: FileProgress<'_>,
+) -> Option<ga_core::InstalledApp> {
+    let apps: Vec<_> = inventory::discover(reg, roots)
+        .iter()
+        .filter(|c| c.name.eq_ignore_ascii_case(name))
+        .map(|c| inspect::inspect_with_progress(c, matcher, limits, progress))
+        .collect();
+    merge_same_name(apps).into_iter().next()
+}
+
 /// The same product installed twice (32- and 64-bit, or per-user and
 /// per-machine) is shown once, with the findings of both.
 fn merge_same_name(apps: Vec<ga_core::InstalledApp>) -> Vec<ga_core::InstalledApp> {
@@ -83,6 +102,12 @@ fn merge_same_name(apps: Vec<ga_core::InstalledApp>) -> Vec<ga_core::InstalledAp
                 }
                 existing.bytes_scanned += app.bytes_scanned;
                 existing.truncated |= app.truncated;
+                existing.skipped_count += app.skipped_count;
+                existing.skipped_bytes += app.skipped_bytes;
+                existing.too_many_files |= app.too_many_files;
+                existing.full_scan &= app.full_scan;
+                let room = ga_core::MAX_SKIPPED_LISTED.saturating_sub(existing.skipped.len());
+                existing.skipped.extend(app.skipped.into_iter().take(room));
                 existing.electron |= app.electron;
             }
             None => out.push(app),

@@ -389,7 +389,7 @@ impl DecodedPayload {
 }
 
 /// How sure a finding is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Confidence {
     /// The SDK's own files or package are bundled with the app.
     High,
@@ -399,7 +399,7 @@ pub enum Confidence {
 }
 
 /// A tracking or telemetry SDK found inside an installed app.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppFinding {
     /// SDK or service name, e.g. "Sentry", or the company for address-only hits.
     pub sdk: String,
@@ -413,7 +413,7 @@ pub struct AppFinding {
 }
 
 /// An installed desktop app and the SDKs found in it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InstalledApp {
     pub name: String,
     pub publisher: Option<String>,
@@ -423,8 +423,45 @@ pub struct InstalledApp {
     pub electron: bool,
     pub findings: Vec<AppFinding>,
     pub bytes_scanned: u64,
-    /// The scan stopped at the size limit before reading every file.
+    /// Some code was not read: see `skipped`.
     pub truncated: bool,
+    /// Files whose code was not read, or only partly (at most
+    /// `MAX_SKIPPED_LISTED`; `skipped_count` has the full number).
+    #[serde(default)]
+    pub skipped: Vec<SkippedFile>,
+    #[serde(default)]
+    pub skipped_count: usize,
+    #[serde(default)]
+    pub skipped_bytes: u64,
+    /// The folder has more files than the scan lists, so some were not even looked at.
+    #[serde(default)]
+    pub too_many_files: bool,
+    /// Scanned without any size limits, at the user's request.
+    #[serde(default)]
+    pub full_scan: bool,
+}
+
+/// Files listed per app in `InstalledApp::skipped`.
+pub const MAX_SKIPPED_LISTED: usize = 50;
+
+/// A file the app scan did not read completely.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SkippedFile {
+    /// Path inside the app's folder.
+    pub path: String,
+    pub size: u64,
+    pub reason: SkipReason,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkipReason {
+    /// Larger than the per-file limit.
+    TooLarge,
+    /// The app's reading budget ran out before this file.
+    AppLimit,
+    /// The budget ran out partway through this file.
+    PartlyRead,
 }
 
 /// Result of scanning installed desktop apps for SDKs.

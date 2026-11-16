@@ -89,6 +89,27 @@ git push origin v0.1.0
 
 The installer appears on the Releases page about 20 minutes later. The workflow stops if the tag and the version differ. A tag with a dash, such as `v0.2.0-beta.1`, becomes a pre-release. To test the build without publishing, run the workflow by hand from the Actions tab; the installer is attached to the run.
 
+### Automatic updates
+
+Installed copies check `latest.json` on the newest (non-pre-release) GitHub Release when they open and every six hours, and offer "Update now". The update is a signed installer: the app refuses one not signed with the project's key. Set this up once:
+
+1. Create the key pair (choose a password, or leave it empty):
+   ```
+   cd apps\desktop
+   pnpm tauri signer generate -w "$env:USERPROFILE\.tauri\guardian-angel.key"
+   ```
+2. In the repository's **Settings > Secrets and variables > Actions**, add:
+   - `TAURI_SIGNING_PRIVATE_KEY`: the contents of `guardian-angel.key`
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password (leave the secret empty if none)
+   - `GA_UPDATER_PUBKEY`: the contents of `guardian-angel.key.pub`
+3. Keep the private key safe. If it is lost, installed copies can no longer be updated and users must reinstall once.
+
+Releases built without these secrets still install, but cannot update themselves and are not offered as updates. Updates download from GitHub without signing in, so they only work once the repository (or a separate releases repository) is public.
+
+### Tracker list
+
+`data/sources/seed_trackers.json` is a hand-picked list; `data/sources/ddg_trackers.json` is generated from DuckDuckGo's [Tracker Radar](https://github.com/duckduckgo/tracker-radar) blocklist. Refresh it with `.\scripts\update-tracker-list.ps1` and commit the result. Where both list a domain, the hand-picked entry wins.
+
 Always build the desktop app with `pnpm tauri build`, never `cargo build`: only Tauri's build embeds the interface (a plain cargo build points the app at `localhost:1420`). Keep the `tauri` crate and the `@tauri-apps/*` npm packages on the same minor version (2.11), or the build refuses to run.
 
 ### Test
@@ -140,7 +161,7 @@ Add `--json` to most commands for machine-readable output.
 | `crates/core` | Shared types |
 | `crates/platform-win` | Thin Windows API wrappers; the only crate allowed `unsafe` |
 | `data/sources` | Tracker list and SDK signature catalog |
-| `scripts` | Installer build script |
+| `scripts` | Installer build and tracker list update |
 
 ## Known gaps
 
@@ -148,11 +169,15 @@ Add `--json` to most commands for machine-readable output.
 - **Code signing:** the installer and app are not signed yet, so Windows SmartScreen warns on first run.
 - **Testing:** tested on Windows 10 22H2. Needs Windows 11 and Home / Pro / Enterprise runs, and the installed service needs a full test as SYSTEM.
 - **Network monitor:** sees lookups through the Windows DNS client only; browsers using Secure DNS bypass it. Data volumes per program are not measured yet.
-- **App scan:** reads up to 64 MB of code per app; the first scan takes about 1.5 minutes. Results are not cached per file yet. Store (MSIX) apps are not scanned.
+- **App scan:** reads up to 64 MB of code per app (the Apps page lists partly scanned apps and can scan one completely); the first scan takes about 1.5 minutes. Results are not cached per file yet. Store (MSIX) apps are not scanned.
 - **Proxy:** HTTP/1.1 towards apps only, no plain-HTTP proxying, compressed request bodies are not decoded, and the CA key is protected by folder permissions but not yet encrypted.
 - **Decoders:** 7 trackers. Session-recording tools (Hotjar, Clarity) are listed but not decoded.
 - **DNS resolver:** UDP only. Port 53 is taken on some PCs (for example by Internet Connection Sharing).
 - **Settings:** Windows 11-only settings (Recall) and activity history are not checked yet.
-- **Tracker list:** a hand-curated seed list of about 50 companies; importing DuckDuckGo Tracker Radar needs a licence check first.
+- **Tracker list:** DuckDuckGo's data is licensed for non-commercial use only. A commercial release needs a licence from DuckDuckGo or a replacement list.
+
+## Credits
+
+Tracker data from [DuckDuckGo Tracker Radar](https://github.com/duckduckgo/tracker-radar), licensed [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). `data/sources/ddg_trackers.json` is an adapted version (domains mapped to Guardian Angel's categories and company names) under the same licence.
 
 Design proposal and roadmap: https://claude.ai/artifact/PRVZ8nW3mQiCMLxHzkce4j

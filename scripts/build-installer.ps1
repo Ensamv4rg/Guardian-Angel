@@ -6,6 +6,12 @@
 #   .\scripts\build-installer.ps1 -SidecarOnly  # only prepare the service for `pnpm tauri dev`
 #
 # Needs: Rust (MSVC), Node.js, pnpm. Tauri downloads its NSIS tools the first time.
+#
+# Self-updating builds: set TAURI_SIGNING_PRIVATE_KEY (and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD if it has one) and GA_UPDATER_PUBKEY.
+# The installer is then signed for the updater (a .sig file next to it) and
+# the app accepts updates signed with the same key. Without them the build
+# works but cannot update itself.
 
 param([switch]$SidecarOnly)
 
@@ -34,7 +40,18 @@ Write-Host "Building the desktop app and installer..."
 Set-Location (Join-Path $root "apps\desktop")
 pnpm install --frozen-lockfile
 if ($LASTEXITCODE -ne 0) { throw "pnpm install failed" }
-pnpm tauri build
+$tauriArgs = @("tauri", "build")
+if ($env:TAURI_SIGNING_PRIVATE_KEY) {
+    if (-not $env:GA_UPDATER_PUBKEY) { throw "TAURI_SIGNING_PRIVATE_KEY is set but GA_UPDATER_PUBKEY is not" }
+    Write-Host "Signing the installer for the updater."
+    $override = Join-Path ([IO.Path]::GetTempPath()) "guardian-angel-updater.json"
+    @{ bundle = @{ createUpdaterArtifacts = $true }; plugins = @{ updater = @{ pubkey = $env:GA_UPDATER_PUBKEY.Trim() } } } |
+        ConvertTo-Json -Depth 5 | Out-File -Encoding ascii $override
+    $tauriArgs += @("--config", $override)
+} else {
+    Write-Host "No updater signing key set: this build will not update itself."
+}
+& pnpm @tauriArgs
 if ($LASTEXITCODE -ne 0) { throw "installer build failed" }
 
 $setup = Get-ChildItem (Join-Path $root "target\release\bundle\nsis") -Filter "*-setup.exe" | Sort-Object LastWriteTime | Select-Object -Last 1

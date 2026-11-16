@@ -4,7 +4,7 @@ use crate::score;
 use ga_blocker::settings::journal::Journal;
 use ga_blocker::settings::store::{RegValue, RegistryStore};
 use ga_blocker::settings::{self, FixValue, SettingsError};
-use ga_core::{AppScan, Exposure, ExtensionScan, PrivacyScan};
+use ga_core::{AppScan, Exposure, ExtensionScan, InstalledApp, PrivacyScan};
 use ga_ipc::Request;
 use ga_knowledge::TrackerDb;
 use ga_proxy::{CertAuthority, InspectedRequest, Proxy, ProxyConfig, ProxyEvent, Rules};
@@ -77,6 +77,9 @@ struct UserState {
     extensions: Option<ExtensionScan>,
     privacy: Option<PrivacyScan>,
     apps: Option<AppScan>,
+    /// Apps the user asked to scan completely. They replace the normal,
+    /// limited result until the app is updated.
+    full_scans: Vec<InstalledApp>,
     baseline: Option<Baseline>,
     alerts: Vec<Alert>,
 }
@@ -119,6 +122,7 @@ impl Engine {
                 let state = UserState {
                     baseline: read_json(&ctx.data_dir.join("baseline.json")),
                     alerts: read_json(&ctx.data_dir.join("alerts.json")).unwrap_or_default(),
+                    full_scans: read_json(&ctx.data_dir.join("full_scans.json")).unwrap_or_default(),
                     ..UserState::default()
                 };
                 Arc::new(UserSlot {
@@ -200,6 +204,16 @@ impl Engine {
                 Ok(json!(events))
             }
             Request::RunningApps => Ok(self.running_apps(&slot.ctx)),
+            Request::ScanAppFully { name } => {
+                let known = lock(&slot.state)
+                    .apps
+                    .as_ref()
+                    .is_some_and(|scan| scan.apps.iter().any(|a| a.name.eq_ignore_ascii_case(&name)));
+                if !known {
+                    return Err(format!("'{name}' is not in the list of installed apps."));
+                }
+                Ok(json!({ "started": self.start_full_app_scan(slot, name) }))
+            }
             Request::ProxyExportCa => {
                 let ca = self.proxy.ca.as_ref().ok_or("The inspection certificate is not available.")?;
                 let path = slot.ctx.data_dir.join("guardian-angel-inspection.pem");
@@ -413,8 +427,10 @@ impl Engine {
                     )
                 })
                 .await;
-                if let Ok(apps) = apps {
+                if let Ok(mut apps) = apps {
                     let mut state = lock(&slot.state);
+                    use_full_scans(&mut apps, &mut state.full_scans);
+                    save_json(&slot.ctx.data_dir.join("full_scans.json"), &state.full_scans);
                     let changes = state.baseline.as_ref().map(|b| alerts::compare_apps(b, &apps)).unwrap_or_default();
                     add_alerts(&mut state, changes);
                     let baseline = state.baseline.get_or_insert_with(Baseline::default);
@@ -430,6 +446,70 @@ impl Engine {
         });
         true
     }
+
+    /// Reads every file of one app in the background, then puts the result
+    /// in place of the limited one. Shares the "scanning" flag with the
+    /// normal scan so the two never run at once.
+    fn start_full_app_scan(self: &Arc<Self>, slot: Arc<UserSlot>, name: String) -> bool {
+        {
+            let mut state = lock(&slot.state);
+            if state.scanning {
+                return false;
+            }
+            state.scanning = true;
+        }
+        let engine = self.clone();
+        tokio::spawn(async move {
+            let (ctx, matcher, s, app_name) = (slot.ctx.clone(), engine.matcher.clone(), slot.clone(), name.clone());
+            let step = format!("Reading all of {name}");
+            s.set_progress(0, &step, "Listing its files");
+            let result = tokio::task::spawn_blocking(move || {
+                ga_scanners::apps::scan_one_app(
+                    &ctx.registry(),
+                    &ctx.app_roots,
+                    &matcher,
+                    &app_name,
+                    Limits::everything(),
+                    &|done, total, file| {
+                        let percent = (done.saturating_mul(100)).checked_div(total).unwrap_or(0).min(99) as u32;
+                        let mb = |b: u64| b / (1024 * 1024);
+                        s.set_progress(percent, &step, &format!("{file} ({} of {} MB)", mb(done), mb(total)));
+                    },
+                )
+            })
+            .await;
+            let mut state = lock(&slot.state);
+            if let Ok(Some(app)) = result {
+                if let Some(scan) = state.apps.as_mut()
+                    && let Some(slot_app) = scan.apps.iter_mut().find(|a| a.name.eq_ignore_ascii_case(&app.name))
+                {
+                    *slot_app = app.clone();
+                }
+                state.full_scans.retain(|a| !a.name.eq_ignore_ascii_case(&app.name));
+                state.full_scans.push(app);
+                save_json(&slot.ctx.data_dir.join("full_scans.json"), &state.full_scans);
+            }
+            state.scanning = false;
+            state.progress = None;
+        });
+        true
+    }
+}
+
+/// Puts remembered full scans in place of the limited results for the same
+/// app, and forgets those whose app was updated (other version or folder)
+/// or uninstalled.
+fn use_full_scans(scan: &mut AppScan, full_scans: &mut Vec<InstalledApp>) {
+    full_scans.retain(|full| {
+        let Some(app) = scan.apps.iter_mut().find(|a| a.name.eq_ignore_ascii_case(&full.name)) else {
+            return false;
+        };
+        if app.version != full.version || app.install_dir != full.install_dir {
+            return false;
+        }
+        *app = full.clone();
+        true
+    });
 }
 
 impl UserSlot {
@@ -539,4 +619,40 @@ pub fn unix_now() -> i64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod full_scan_tests {
+    use super::*;
+
+    fn app(name: &str, version: &str, full: bool) -> InstalledApp {
+        InstalledApp {
+            name: name.into(),
+            publisher: None,
+            version: Some(version.into()),
+            install_dir: format!(r"C:\Apps\{name}"),
+            electron: false,
+            findings: Vec::new(),
+            bytes_scanned: 0,
+            truncated: !full,
+            skipped: Vec::new(),
+            skipped_count: usize::from(!full),
+            skipped_bytes: 0,
+            too_many_files: false,
+            full_scan: full,
+        }
+    }
+
+    #[test]
+    fn full_scans_replace_limited_results_until_the_app_changes() {
+        let mut scan = AppScan {
+            apps: vec![app("Big", "1.0", false), app("Updated", "2.0", false)],
+            warnings: Vec::new(),
+        };
+        let mut full = vec![app("Big", "1.0", true), app("Updated", "1.0", true), app("Gone", "1.0", true)];
+        use_full_scans(&mut scan, &mut full);
+        assert!(scan.apps[0].full_scan, "same version: the full result is used");
+        assert!(!scan.apps[1].full_scan, "updated app: back to the normal scan");
+        assert_eq!(full.len(), 1, "results for updated and removed apps are forgotten");
+    }
 }

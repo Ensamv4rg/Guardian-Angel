@@ -4,7 +4,7 @@
 use super::asar::Asar;
 use super::inventory::Candidate;
 use super::matcher::{Found, Matcher, Owner};
-use ga_core::{AppFinding, Category, Confidence, InstalledApp};
+use ga_core::{AppFinding, Category, Confidence, InstalledApp, MAX_SKIPPED_LISTED, SkipReason, SkippedFile};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -31,6 +31,26 @@ impl Default for Limits {
         }
     }
 }
+
+impl Limits {
+    /// No limits: every file of the app is read. Can take minutes for a
+    /// large app, so only on request.
+    pub fn everything() -> Self {
+        Self {
+            max_depth: 64,
+            max_entries: usize::MAX,
+            max_file_bytes: u64::MAX,
+            max_app_bytes: u64::MAX,
+        }
+    }
+
+    pub fn is_unlimited(&self) -> bool {
+        self.max_app_bytes == u64::MAX
+    }
+}
+
+/// Reports (bytes read, bytes to read, file being read) during one app's scan.
+pub type FileProgress<'a> = &'a dyn Fn(u64, u64, &str);
 
 /// Runtime files that embed Chromium, Qt WebEngine or the C runtime. They
 /// contain web addresses of their own and say nothing about the app.
@@ -81,7 +101,11 @@ enum Key {
 }
 
 pub fn inspect(app: &Candidate, matcher: &Matcher, limits: Limits) -> InstalledApp {
-    let files = walk(&app.dir, limits);
+    inspect_with_progress(app, matcher, limits, &|_, _, _| {})
+}
+
+pub fn inspect_with_progress(app: &Candidate, matcher: &Matcher, limits: Limits, progress: FileProgress<'_>) -> InstalledApp {
+    let (files, too_many_files) = walk(&app.dir, limits);
     let electron = files.iter().any(|f| f.name == "app.asar");
     let mut hits: BTreeMap<Key, (Hit, Option<Category>)> = BTreeMap::new();
     let rel = |p: &Path| p.strip_prefix(&app.dir).unwrap_or(p).display().to_string();
@@ -112,26 +136,32 @@ pub fn inspect(app: &Candidate, matcher: &Matcher, limits: Limits) -> InstalledA
 
     // 3. Tracker addresses in code. For Electron apps the exe and DLLs are
     // the Chromium runtime, so only the app's own code is searched.
-    let mut targets: Vec<&FileInfo> = files
-        .iter()
-        .filter(|f| f.size <= limits.max_file_bytes && searchable(f, electron))
-        .collect();
+    let mut skipped: Vec<(SkipReason, &FileInfo)> = Vec::new();
+    let mut targets: Vec<&FileInfo> = Vec::new();
+    for f in files.iter().filter(|f| searchable(f, electron)) {
+        if f.size > limits.max_file_bytes {
+            skipped.push((SkipReason::TooLarge, f));
+        } else {
+            targets.push(f);
+        }
+    }
     // App code first: archives and scripts, then native files by size.
     targets.sort_by_key(|f| (!matches!(f.ext.as_str(), "asar" | "js" | "cjs" | "mjs"), f.size));
+    let to_read: u64 = targets.iter().map(|f| f.size).sum::<u64>().min(limits.max_app_bytes);
 
     let mut scanned = 0u64;
-    let mut truncated = false;
     for f in targets {
         if scanned >= limits.max_app_bytes {
-            truncated = true;
-            break;
+            skipped.push((SkipReason::AppLimit, f));
+            continue;
         }
+        progress(scanned, to_read, &rel(&f.path));
         let mut found = Found::new();
         let budget = limits.max_app_bytes - scanned;
         if let Ok(n) = matcher.scan_file(&f.path, budget, &mut found) {
             scanned += n;
             if n < f.size {
-                truncated = true;
+                skipped.push((SkipReason::PartlyRead, f));
             }
         }
         for (pattern, example) in found {
@@ -179,6 +209,21 @@ pub fn inspect(app: &Candidate, matcher: &Matcher, limits: Limits) -> InstalledA
         .collect();
     findings.sort_by(|a, b| a.confidence.cmp(&b.confidence).then_with(|| a.sdk.cmp(&b.sdk)));
 
+    // Biggest first: those are the ones worth knowing about.
+    skipped.sort_by(|a, b| b.1.size.cmp(&a.1.size));
+    let skipped_bytes = skipped.iter().map(|(_, f)| f.size).sum();
+    let skipped_count = skipped.len();
+    let truncated = skipped_count > 0 || too_many_files;
+    let skipped = skipped
+        .into_iter()
+        .take(MAX_SKIPPED_LISTED)
+        .map(|(reason, f)| SkippedFile {
+            path: rel(&f.path),
+            size: f.size,
+            reason,
+        })
+        .collect();
+
     InstalledApp {
         name: app.name.clone(),
         publisher: app.publisher.clone(),
@@ -188,6 +233,11 @@ pub fn inspect(app: &Candidate, matcher: &Matcher, limits: Limits) -> InstalledA
         findings,
         bytes_scanned: scanned,
         truncated,
+        skipped,
+        skipped_count,
+        skipped_bytes,
+        too_many_files,
+        full_scan: limits.is_unlimited(),
     }
 }
 
@@ -218,8 +268,9 @@ struct FileInfo {
 }
 
 /// Lists files under `root` breadth-first, within the depth and entry limits.
-/// Folders directly inside `node_modules` are reported as packages.
-fn walk(root: &Path, limits: Limits) -> Vec<FileInfo> {
+/// Folders directly inside `node_modules` are reported as packages. The flag
+/// is set when the entry limit cut the listing short.
+fn walk(root: &Path, limits: Limits) -> (Vec<FileInfo>, bool) {
     let mut out = Vec::new();
     let mut queue = vec![(root.to_path_buf(), 0usize)];
     let mut seen = 0usize;
@@ -234,7 +285,7 @@ fn walk(root: &Path, limits: Limits) -> Vec<FileInfo> {
         for e in entries.flatten() {
             seen += 1;
             if seen > limits.max_entries {
-                return out;
+                return (out, true);
             }
             let Ok(t) = e.file_type() else { continue };
             let name = e.file_name().to_string_lossy().into_owned();
@@ -271,5 +322,5 @@ fn walk(root: &Path, limits: Limits) -> Vec<FileInfo> {
             }
         }
     }
-    out
+    (out, false)
 }

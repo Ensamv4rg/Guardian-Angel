@@ -119,6 +119,35 @@ fn size_limit_marks_scan_as_truncated() {
 }
 
 #[test]
+fn lists_skipped_files_and_scans_everything_on_request() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (reg, roots) = setup(tmp.path());
+    let matcher = Matcher::bundled(&TrackerDb::bundled().unwrap());
+    // tool.exe (the Criteo address) is over the per-file limit; Sentry.dll is not.
+    let limits = Limits {
+        max_file_bytes: 10,
+        ..Limits::default()
+    };
+    let scan = scan_apps_with(&reg, &roots, &matcher, limits);
+    let native = scan.apps.iter().find(|a| a.name == "NativeTool").unwrap();
+    assert!(native.truncated && !native.full_scan);
+    assert_eq!(native.skipped_count, 1);
+    assert_eq!(native.skipped[0].path, "tool.exe");
+    assert_eq!(native.skipped[0].reason, ga_core::SkipReason::TooLarge);
+    assert!(native.findings.iter().all(|f| f.company != "Criteo"), "the skipped file was not read");
+
+    let files = std::sync::Mutex::new(Vec::new());
+    let full = scan_one_app(&reg, &roots, &matcher, "nativetool", Limits::everything(), &|_, _, file| {
+        files.lock().unwrap().push(file.to_owned());
+    })
+    .unwrap();
+    assert!(full.full_scan && !full.truncated && full.skipped.is_empty());
+    assert!(full.findings.iter().any(|f| f.company == "Criteo"));
+    assert!(files.into_inner().unwrap().contains(&"tool.exe".to_owned()), "progress names each file");
+    assert!(scan_one_app(&reg, &roots, &matcher, "Nope", Limits::everything(), &|_, _, _| {}).is_none());
+}
+
+#[test]
 fn reports_progress_for_every_app() {
     let tmp = tempfile::tempdir().unwrap();
     let (reg, roots) = setup(tmp.path());

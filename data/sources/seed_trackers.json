@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "note": "Hand-curated seed list for early development. Replace with a build from DuckDuckGo Tracker Radar, Disconnect and EasyPrivacy once their licences are checked (see design doc, Risks).",
+  "note": "Hand-picked list. Takes priority over ddg_trackers.json (generated from DuckDuckGo Tracker Radar by kb-builder) where both list a domain.",
   "companies": [
     { "name": "Google", "domains": {
       "doubleclick.net": "advertising",

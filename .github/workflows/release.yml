@@ -5,6 +5,12 @@
 # Test build:   Actions tab -> Release -> "Run workflow". The installer is
 #               attached to the run as an artifact and no release is created.
 # A tag with a dash (v0.2.0-beta.1) is published as a pre-release.
+#
+# Updates: with the repository secrets TAURI_SIGNING_PRIVATE_KEY,
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD and GA_UPDATER_PUBKEY set, the installer
+# is signed and latest.json is published, which installed copies check to
+# update themselves. Without them the release works but cannot be installed
+# as an update.
 
 name: Release
 
@@ -56,6 +62,10 @@ jobs:
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
 
       - name: Build the installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GA_UPDATER_PUBKEY: ${{ secrets.GA_UPDATER_PUBKEY }}
         run: ./scripts/build-installer.ps1
 
       - name: Name the installer
@@ -67,10 +77,30 @@ jobs:
           Copy-Item $setup.FullName $name
           "path=$name" >> $env:GITHUB_OUTPUT
 
+          # The update manifest installed copies read. The signature covers
+          # the file's contents, so it stays valid under the new name.
+          $sig = "$($setup.FullName).sig"
+          if (Test-Path $sig) {
+            $version = "${{ steps.version.outputs.version }}"
+            $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$name"
+            $platform = @{ signature = (Get-Content $sig -Raw).Trim(); url = $url }
+            @{
+              version = $version
+              notes = "See https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+              pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+              platforms = @{ "windows-x86_64" = $platform; "windows-x86_64-nsis" = $platform }
+            } | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8NoBOM latest.json
+            "manifest=latest.json" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "::warning::No updater signature: set the signing secrets so installed copies can update to this release."
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.installer.outputs.path }}
-          path: ${{ steps.installer.outputs.path }}
+          path: |
+            ${{ steps.installer.outputs.path }}
+            ${{ steps.installer.outputs.manifest }}
           if-no-files-found: error
 
       - name: Publish the release
@@ -79,7 +109,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "${{ github.ref_name }}"
-          $ghArgs = @($tag, "${{ steps.installer.outputs.path }}", "--title", "Guardian Angel $tag", "--generate-notes", "--verify-tag")
+          $files = @("${{ steps.installer.outputs.path }}")
+          if ("${{ steps.installer.outputs.manifest }}") { $files += "${{ steps.installer.outputs.manifest }}" }
+          $ghArgs = @($tag) + $files + @("--title", "Guardian Angel $tag", "--generate-notes", "--verify-tag")
           if ($tag.Contains("-")) { $ghArgs += "--prerelease" }
           gh release create @ghArgs
           if ($LASTEXITCODE -ne 0) { throw "Creating the release failed" }

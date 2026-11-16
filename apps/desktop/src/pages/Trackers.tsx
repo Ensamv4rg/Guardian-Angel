@@ -60,6 +60,10 @@ export default function TrackersPage({ overview }: PageProps) {
         )}
       </Card>
       {c.unclassified_cookies > 0 && <OtherCookiesCard report={c} />}
+      <p className="small muted">
+        Tracker data: Guardian Angel's own list and DuckDuckGo Tracker Radar (CC BY-NC-SA 4.0), used for
+        non-commercial purposes.
+      </p>
     </>
   );
 }

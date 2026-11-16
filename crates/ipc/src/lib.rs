@@ -53,6 +53,11 @@ pub enum Request {
     ProxyExportCa,
     /// Programs running for the calling user, to pick for inspection.
     RunningApps,
+    /// Read every file of one installed app (by name), without the size
+    /// limits of the normal scan. Runs in the background like `ScanNow`.
+    ScanAppFully {
+        name: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

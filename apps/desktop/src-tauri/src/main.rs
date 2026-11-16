@@ -117,8 +117,62 @@ fn windowed_pids() -> Vec<u32> {
     ga_platform_win::processes_with_windows().into_iter().collect()
 }
 
+/// Updates need the release signing key's public half in the config. Builds
+/// made without it (development, local installers) cannot update themselves.
+fn updates_configured(app: &tauri::AppHandle) -> bool {
+    app.config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|u| u.get("pubkey"))
+        .and_then(Value::as_str)
+        .is_some_and(|key| !key.trim().is_empty())
+}
+
+/// Asks the release server whether a newer version exists. Sends nothing
+/// but the request for the release list.
+#[tauri::command]
+async fn check_update(app: tauri::AppHandle) -> Result<Value, String> {
+    use tauri_plugin_updater::UpdaterExt;
+    let current = app.package_info().version.to_string();
+    if !updates_configured(&app) {
+        return Ok(json!({ "configured": false, "current": current, "available": null }));
+    }
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| format!("Could not check for updates: {e}"))?;
+    let available = update.map(|u| json!({ "version": u.version, "notes": u.body, "date": u.date.map(|d| d.to_string()) }));
+    Ok(json!({ "configured": true, "current": current, "available": available }))
+}
+
+/// Downloads the newer installer, checks its signature and runs it. The
+/// installer closes the app, updates the app and the service, and reopens it.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri_plugin_updater::UpdaterExt;
+    if !updates_configured(&app) {
+        return Err("This copy of Guardian Angel was built without updates.".into());
+    }
+    let update = app
+        .updater()
+        .map_err(|e| e.to_string())?
+        .check()
+        .await
+        .map_err(|e| format!("Could not check for updates: {e}"))?
+        .ok_or("Guardian Angel is already up to date.")?;
+    update
+        .download_and_install(|_, _| {}, || {})
+        .await
+        .map_err(|e| format!("The update could not be installed: {e}"))?;
+    app.restart();
+}
+
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Connection::default())
         .invoke_handler(tauri::generate_handler![
             ipc,
@@ -126,7 +180,9 @@ fn main() {
             trust_certificate,
             remove_certificate,
             launch_with_proxy,
-            windowed_pids
+            windowed_pids,
+            check_update,
+            install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running Guardian Angel");

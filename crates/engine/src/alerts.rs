@@ -229,6 +229,11 @@ mod tests {
                     .collect(),
                 bytes_scanned: 0,
                 truncated: false,
+                skipped: Vec::new(),
+                skipped_count: 0,
+                skipped_bytes: 0,
+                too_many_files: false,
+                full_scan: false,
             }],
             warnings: vec![],
         };
