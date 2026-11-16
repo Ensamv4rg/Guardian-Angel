@@ -80,14 +80,9 @@ The installer is written to `target\release\bundle\nsis\`. The first build downl
 
 ### Publish a release
 
-GitHub Actions builds and publishes the installer (`.github/workflows/release.yml`). Set the new `version` in `apps/desktop/src-tauri/tauri.conf.json`, commit, then push a matching tag:
+GitHub Actions builds and publishes the installer (`.github/workflows/release.yml`). Set the new `version` in `apps/desktop/src-tauri/tauri.conf.json`, commit and push. Then, on GitHub, open **Actions > Release > Run workflow** and leave **Publish a release** ticked. It tags the commit `v<version>` and the installer appears on the Releases page about 20 minutes later. Pushing a tag yourself (`git tag v0.1.0`, `git push origin v0.1.0`) does the same.
 
-```
-git tag v0.1.0
-git push origin v0.1.0
-```
-
-The installer appears on the Releases page about 20 minutes later. The workflow stops if the tag and the version differ. A tag with a dash, such as `v0.2.0-beta.1`, becomes a pre-release. To test the build without publishing, run the workflow by hand from the Actions tab; the installer is attached to the run.
+The run stops at once if that version was already released, or if a pushed tag doesn't match the version. A version with a dash, such as `0.2.0-beta.1`, becomes a pre-release. For a test build without publishing, untick **Publish a release**; the installer is then only attached to the run.
 
 ### Automatic updates
 

@@ -1,10 +1,13 @@
 # Builds the Windows installer and publishes it as a GitHub Release.
 #
-# To release:   bump "version" in apps/desktop/src-tauri/tauri.conf.json, commit,
-#               then  git tag v0.1.0  and  git push origin v0.1.0
-# Test build:   Actions tab -> Release -> "Run workflow". The installer is
-#               attached to the run as an artifact and no release is created.
-# A tag with a dash (v0.2.0-beta.1) is published as a pre-release.
+# To release, set "version" in apps/desktop/src-tauri/tauri.conf.json, commit
+# and push, then either:
+#   - Actions tab -> Release -> "Run workflow" (with "Publish a release"
+#     ticked): tags the commit v<version> and publishes the release, or
+#   - push a tag yourself:  git tag v0.1.0  and  git push origin v0.1.0
+# Untick "Publish a release" for a test build: the installer is only attached
+# to the run as an artifact.
+# A version with a dash (0.2.0-beta.1) is published as a pre-release.
 #
 # Updates: with the repository secret TAURI_SIGNING_PRIVATE_KEY set (and
 # TAURI_SIGNING_PRIVATE_KEY_PASSWORD if the key has one), the installer is
@@ -18,6 +21,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish a release (tags this commit v<version from tauri.conf.json>)"
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -40,9 +48,22 @@ jobs:
         id: version
         run: |
           $version = (Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $tag = "v$version"
           "version=$version" >> $env:GITHUB_OUTPUT
-          if ("${{ github.ref_type }}" -eq "tag" -and "${{ github.ref_name }}" -ne "v$version") {
-            throw "Tag ${{ github.ref_name }} does not match the app version v$version in tauri.conf.json"
+          "tag=$tag" >> $env:GITHUB_OUTPUT
+          if ("${{ github.ref_type }}" -eq "tag") {
+            if ("${{ github.ref_name }}" -ne $tag) {
+              throw "Tag ${{ github.ref_name }} does not match the app version $tag in tauri.conf.json"
+            }
+            "publish=true" >> $env:GITHUB_OUTPUT
+          } elseif ("${{ inputs.publish }}" -eq "true") {
+            # Fail now rather than after a 20-minute build.
+            if (git ls-remote --tags origin "refs/tags/$tag") {
+              throw "Release $tag already exists. Raise the version in tauri.conf.json, commit, and run again."
+            }
+            "publish=true" >> $env:GITHUB_OUTPUT
+          } else {
+            "publish=false" >> $env:GITHUB_OUTPUT
           }
 
       # rust-toolchain.toml picks the toolchain; this installs it.
@@ -81,11 +102,11 @@ jobs:
           $sig = "$($setup.FullName).sig"
           if (Test-Path $sig) {
             $version = "${{ steps.version.outputs.version }}"
-            $url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$name"
+            $url = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/$name"
             $platform = @{ signature = (Get-Content $sig -Raw).Trim(); url = $url }
             @{
               version = $version
-              notes = "See https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
+              notes = "See https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
               pub_date = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
               platforms = @{ "windows-x86_64" = $platform; "windows-x86_64-nsis" = $platform }
             } | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8NoBOM latest.json
@@ -103,14 +124,15 @@ jobs:
           if-no-files-found: error
 
       - name: Publish the release
-        if: github.ref_type == 'tag'
+        if: steps.version.outputs.publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
+          $tag = "${{ steps.version.outputs.tag }}"
           $files = @("${{ steps.installer.outputs.path }}")
           if ("${{ steps.installer.outputs.manifest }}") { $files += "${{ steps.installer.outputs.manifest }}" }
-          $ghArgs = @($tag) + $files + @("--title", "Guardian Angel $tag", "--generate-notes", "--verify-tag")
+          # Creates the tag on this commit when it does not exist yet (manual runs).
+          $ghArgs = @($tag) + $files + @("--title", "Guardian Angel $tag", "--generate-notes", "--target", "${{ github.sha }}")
           if ($tag.Contains("-")) { $ghArgs += "--prerelease" }
           gh release create @ghArgs
           if ($LASTEXITCODE -ne 0) { throw "Creating the release failed" }
