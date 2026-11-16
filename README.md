@@ -19,7 +19,7 @@ Guardian Angel never changes anything without you asking, and every change can b
 
 ## Install
 
-Run `Guardian Angel_<version>_x64-setup.exe` and accept the Windows prompt. The installer:
+Download `GuardianAngel-Setup-<version>.exe` from the [Releases](../../releases) page, run it and accept the Windows prompt. Nothing else needs to be installed first. The installer:
 
 - installs the app and its background service, which starts with Windows
 - opens Guardian Angel when it finishes
@@ -77,6 +77,17 @@ pnpm tauri dev
 ```
 
 The installer is written to `target\release\bundle\nsis\`. The first build downloads Tauri's NSIS tools and takes about 15 minutes.
+
+### Publish a release
+
+GitHub Actions builds and publishes the installer (`.github/workflows/release.yml`). Set the new `version` in `apps/desktop/src-tauri/tauri.conf.json`, commit, then push a matching tag:
+
+```
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The installer appears on the Releases page about 20 minutes later. The workflow stops if the tag and the version differ. A tag with a dash, such as `v0.2.0-beta.1`, becomes a pre-release. To test the build without publishing, run the workflow by hand from the Actions tab; the installer is attached to the run.
 
 Always build the desktop app with `pnpm tauri build`, never `cargo build`: only Tauri's build embeds the interface (a plain cargo build points the app at `localhost:1420`). Keep the `tauri` crate and the `@tauri-apps/*` npm packages on the same minor version (2.11), or the build refuses to run.
 
