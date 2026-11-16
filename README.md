@@ -70,6 +70,14 @@ cargo run -p ga-cli -- service status            # talk to it over the pipe
 cd apps/desktop && pnpm install && pnpm tauri dev
 ```
 
+To build the desktop app, use Tauri's build command, not `cargo build`: only `tauri build` embeds the interface in the exe (a plain cargo build points the app at the dev server, `localhost:1420`).
+
+```
+cd apps/desktop && pnpm tauri build --no-bundle   # target/release/guardian-angel.exe
+```
+
+The Tauri crate (`tauri` 2.11) and the npm packages (`@tauri-apps/api` 2.11, `@tauri-apps/cli` 2.11) must stay on the same minor version, or `tauri build` refuses to run.
+
 `guardian-service install` (administrator) registers it as a Windows service running as SYSTEM. For UI work in a browser, `pnpm dev` alone serves the UI at http://localhost:1420 and relays to the running service through `target/release/guardian.exe`.
 cargo run -p ga-cli -- privacy --all-apps
 ```
