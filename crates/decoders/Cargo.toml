@@ -1,0 +1,17 @@
+[package]
+name = "ga-decoders"
+description = "Decodes tracker requests (Google Analytics, Meta Pixel, ...) into plain language"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ga-core.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

@@ -275,6 +275,115 @@ pub struct ExtensionScan {
     pub profiles_scanned: usize,
 }
 
+/// How often one program looked up one domain during a capture.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProcessDomainStat {
+    /// Executable name, e.g. `chrome.exe`, or `PID 1234` when it could not be read.
+    pub process: String,
+    /// Full executable path, when known.
+    pub process_path: Option<String>,
+    pub domain: String,
+    pub lookups: u32,
+    /// Lookups that returned an error (e.g. the domain does not exist).
+    pub failed: u32,
+    pub first_seen_unix: i64,
+    pub last_seen_unix: i64,
+}
+
+/// DNS lookups per program, collected over a period of time (FR-5).
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct NetworkCapture {
+    pub started_unix: i64,
+    pub ended_unix: i64,
+    pub total_lookups: u64,
+    pub stats: Vec<ProcessDomainStat>,
+}
+
+/// What kind of personal data a decoded tracker field carries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+pub enum DataKind {
+    /// Plain email address.
+    Email,
+    /// Hashed email address: still identifies you across sites.
+    HashedEmail,
+    /// Hashed phone, name, city or other personal detail.
+    HashedPersonalDetail,
+    /// Name, phone or other personal detail in plain text.
+    PersonalDetail,
+    /// The site's own account ID for you.
+    UserId,
+    /// Long-lived ID stored in your browser (cookie or local storage).
+    PersistentId,
+    /// ID from an ad you clicked.
+    ClickId,
+    PageUrl,
+    PageTitle,
+    Referrer,
+    /// What you did: page view, add to cart, purchase, sign up.
+    Event,
+    /// Money: order value, currency, products.
+    Purchase,
+    /// Screen size, language, browser and device details.
+    Device,
+    /// Which website account receives the data.
+    TrackerAccount,
+    Other,
+}
+
+impl DataKind {
+    /// Plain-language name used in summaries.
+    pub fn describe(self) -> &'static str {
+        match self {
+            DataKind::Email => "your email address",
+            DataKind::HashedEmail => "your email address (hashed, still identifies you)",
+            DataKind::HashedPersonalDetail => "personal details (hashed)",
+            DataKind::PersonalDetail => "personal details",
+            DataKind::UserId => "your account ID on the site",
+            DataKind::PersistentId => "a long-lived ID that recognises your browser",
+            DataKind::ClickId => "the ad you clicked",
+            DataKind::PageUrl => "the page you were on",
+            DataKind::PageTitle => "the page title",
+            DataKind::Referrer => "the page you came from",
+            DataKind::Event => "what you did on the page",
+            DataKind::Purchase => "purchase details",
+            DataKind::Device => "device and browser details",
+            DataKind::TrackerAccount => "the site's tracker account",
+            DataKind::Other => "other details",
+        }
+    }
+}
+
+/// One decoded value from a tracker request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DecodedField {
+    /// Parameter name as sent, e.g. `cid` or `ud[em]`.
+    pub key: String,
+    /// Plain-language label, e.g. "Client ID".
+    pub label: String,
+    pub kind: DataKind,
+    pub value: String,
+}
+
+/// One tracker hit, decoded (FR-16).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DecodedPayload {
+    pub company: &'static str,
+    /// e.g. "Google Analytics 4", "Meta Pixel".
+    pub product: &'static str,
+    pub request_url: String,
+    pub fields: Vec<DecodedField>,
+}
+
+impl DecodedPayload {
+    /// Distinct kinds of data sent, most sensitive first.
+    pub fn kinds(&self) -> Vec<DataKind> {
+        let mut kinds: Vec<DataKind> = self.fields.iter().map(|f| f.kind).collect();
+        kinds.sort();
+        kinds.dedup();
+        kinds
+    }
+}
+
 /// Lowercases a host and strips the leading dot browsers use for domain cookies.
 pub fn normalize_host(host: &str) -> String {
     host.trim().trim_start_matches('.').to_ascii_lowercase()

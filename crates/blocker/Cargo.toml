@@ -1,0 +1,27 @@
+[package]
+name = "ga-blocker"
+description = "Blocking: tracker DNS resolver with profiles and allowlists"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ga-core.workspace = true
+ga-knowledge.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies.hickory-proto]
+workspace = true
+
+[dependencies.tokio]
+workspace = true
+
+[dependencies.thiserror]
+workspace = true
+
+[target."cfg(windows)".dependencies]
+ipconfig = "0.3"

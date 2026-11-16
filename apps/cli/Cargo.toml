@@ -15,10 +15,14 @@ path = "src/main.rs"
 ga-core.workspace = true
 ga-knowledge.workspace = true
 ga-report.workspace = true
+ga-blocker.workspace = true
+ga-decoders.workspace = true
+ga-netmon.workspace = true
 ga-scanners.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

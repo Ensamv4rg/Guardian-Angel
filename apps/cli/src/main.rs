@@ -6,8 +6,9 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use ga_core::{AppAccess, ExtensionScan, ExtensionSource, Exposure, PrivacyScan, Risk, SiteAccess};
+use ga_blocker::{DnsBlocker, Policy, Profile, ResolverConfig};
 use ga_knowledge::TrackerDb;
-use ga_report::{CookieReport, build_cookie_report};
+use ga_report::{CookieReport, NetworkReport, build_cookie_report, build_network_report};
 use std::collections::BTreeSet;
 use std::fmt::Display;
 
@@ -45,6 +46,39 @@ enum Command {
         #[arg(long)]
         all_apps: bool,
     },
+    /// Run the blocking DNS resolver on a local port for testing. Does not
+    /// change Windows' DNS settings.
+    Dns {
+        /// Local port to listen on (127.0.0.1).
+        #[arg(long, default_value_t = 15353)]
+        port: u16,
+        #[arg(long, value_enum, default_value_t = ProfileArg::Balanced)]
+        profile: ProfileArg,
+        /// How long to run, in seconds.
+        #[arg(long, default_value_t = 60)]
+        seconds: u64,
+        /// Upstream DNS server. Default: the servers Windows is using.
+        #[arg(long)]
+        upstream: Option<std::net::IpAddr>,
+    },
+    /// Decode what trackers received, from a HAR file exported from your
+    /// browser's developer tools (Network tab, "Save all as HAR").
+    DecodeHar {
+        /// Path to the .har file.
+        file: std::path::PathBuf,
+        /// Print the full result as JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Watch which programs contact tracking companies, for a set time.
+    Network {
+        /// How long to watch, in seconds.
+        #[arg(long, default_value_t = 60)]
+        seconds: u64,
+        /// Print the full report as JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> Result<()> {
@@ -76,8 +110,189 @@ fn main() -> Result<()> {
                 print_privacy(&scan, all_apps);
             }
         }
+        Command::Dns {
+            port,
+            profile,
+            seconds,
+            upstream,
+        } => run_dns(port, profile.into(), seconds, upstream)?,
+        Command::DecodeHar { file, json } => {
+            let text = std::fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
+            let decoded = ga_decoders::har::decode_har(&text)?;
+            if json {
+                let hits: Vec<_> = decoded.hits.iter().map(|h| (&h.page, &h.payload)).collect();
+                println!("{}", serde_json::to_string_pretty(&hits)?);
+            } else {
+                let db = TrackerDb::bundled().context("loading the tracker list")?;
+                print_har(&decoded, &db);
+            }
+        }
+        Command::Network { seconds, json } => {
+            let db = TrackerDb::bundled().context("loading the tracker list")?;
+            let monitor = ga_netmon::DnsMonitor::start()?;
+            if !json {
+                println!("Watching which programs look up which websites for {seconds} seconds.");
+                println!("Use your computer normally; results appear at the end.");
+            }
+            std::thread::sleep(std::time::Duration::from_secs(seconds));
+            let capture = monitor.stop();
+            let report = build_network_report(&capture, &db);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                print_network(&report);
+            }
+        }
     }
     Ok(())
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum ProfileArg {
+    Relaxed,
+    Balanced,
+    Strict,
+}
+
+impl From<ProfileArg> for Profile {
+    fn from(p: ProfileArg) -> Self {
+        match p {
+            ProfileArg::Relaxed => Profile::Relaxed,
+            ProfileArg::Balanced => Profile::Balanced,
+            ProfileArg::Strict => Profile::Strict,
+        }
+    }
+}
+
+fn run_dns(port: u16, profile: Profile, seconds: u64, upstream: Option<std::net::IpAddr>) -> Result<()> {
+    use std::net::SocketAddr;
+    use std::sync::{Arc, RwLock};
+    use std::time::Duration;
+
+    let upstreams = match upstream {
+        Some(ip) => vec![SocketAddr::new(ip, 53)],
+        None => ga_blocker::upstream::system_upstreams(),
+    };
+    anyhow::ensure!(
+        !upstreams.is_empty(),
+        "No DNS servers found on any connected adapter; pass one with --upstream"
+    );
+    let db = Arc::new(TrackerDb::bundled().context("loading the tracker list")?);
+
+    tokio::runtime::Runtime::new()?.block_on(async {
+        let blocker = DnsBlocker::bind(
+            ResolverConfig {
+                listen: SocketAddr::from(([127, 0, 0, 1], port)),
+                upstreams: upstreams.clone(),
+                upstream_timeout: Duration::from_secs(2),
+            },
+            db,
+            Arc::new(RwLock::new(Policy::new(profile))),
+        )
+        .await
+        .with_context(|| format!("could not listen on 127.0.0.1:{port} (is it in use?)"))?;
+        let stats = blocker.stats();
+
+        let list: Vec<String> = upstreams.iter().map(|u| u.ip().to_string()).collect();
+        println!(
+            "Blocking DNS resolver on 127.0.0.1:{port} ({profile:?} profile), forwarding to {} for {seconds} s.",
+            list.join(", ")
+        );
+        println!("Windows is not using it; send test queries to 127.0.0.1:{port} with a DNS tool that supports custom ports.");
+
+        let _ = tokio::time::timeout(Duration::from_secs(seconds), blocker.run()).await;
+
+        let s = stats.lock().unwrap_or_else(|p| p.into_inner()).clone();
+        println!();
+        println!(
+            "{} queries, {} blocked, {} upstream failures.",
+            s.queries, s.blocked, s.upstream_failures
+        );
+        for (company, n) in &s.blocked_by_company {
+            println!("  blocked {n:>4}  {company}");
+        }
+        anyhow::Ok(())
+    })
+}
+
+fn print_har(r: &ga_decoders::har::HarDecode, db: &TrackerDb) {
+    println!("Guardian Angel - what trackers received");
+    println!(
+        "{} requests in the file, {} tracker hits decoded.",
+        thousands(r.requests),
+        thousands(r.hits.len())
+    );
+
+    let mut last_page: Option<&str> = None;
+    for hit in &r.hits {
+        let page = hit.page.as_deref();
+        if page != last_page {
+            println!();
+            println!("Page: {}", page.unwrap_or("(unknown page)"));
+            last_page = page;
+        }
+        let p = &hit.payload;
+        let sent: Vec<&str> = p.kinds().iter().map(|k| k.describe()).collect();
+        println!();
+        println!("  {} ({}) received {}.", p.product, p.company, sent.join(", "));
+        for f in &p.fields {
+            println!("      {:<32} {}", truncate(&f.label, 32), truncate(&f.value, 70));
+        }
+    }
+
+    // Tracker requests the decoders do not understand yet, by company.
+    let mut undecoded: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    for (host, n) in &r.other_hosts {
+        if let Some(m) = db.classify(host) {
+            *undecoded.entry(m.company).or_default() += n;
+        }
+    }
+    if !undecoded.is_empty() {
+        println!();
+        println!("Other tracker requests that cannot be decoded yet:");
+        for (company, n) in undecoded {
+            println!("  {n:>5}  {company}");
+        }
+    }
+}
+
+fn print_network(r: &NetworkReport) {
+    println!();
+    println!("Guardian Angel - network activity over {} seconds", r.duration_secs);
+    println!(
+        "{} DNS lookups, {} of them ({}%) to {} known tracking companies.",
+        thousands(r.total_lookups as usize),
+        thousands(r.tracker_lookups as usize),
+        if r.total_lookups == 0 { 0 } else { r.tracker_lookups * 100 / r.total_lookups },
+        r.companies.len()
+    );
+
+    if !r.companies.is_empty() {
+        println!();
+        println!("  Company                Lookups  Contacted by");
+        for c in &r.companies {
+            println!(
+                "  {:<22} {:>7}  {}",
+                truncate(&c.company, 22),
+                thousands(c.lookups as usize),
+                truncate(&join(&c.processes), 60)
+            );
+        }
+    }
+
+    let trackers: Vec<_> = r.processes.iter().filter(|p| p.tracker_lookups > 0).collect();
+    if !trackers.is_empty() {
+        println!();
+        println!("  Program                        Tracker lookups  Companies");
+        for p in trackers {
+            println!(
+                "  {:<30} {:>15}  {}",
+                truncate(&p.process, 30),
+                thousands(p.tracker_lookups as usize),
+                truncate(&join(&p.companies), 50)
+            );
+        }
+    }
 }
 
 fn print_extensions(scan: &ExtensionScan) {
@@ -285,7 +500,7 @@ fn print_report(r: &CookieReport, top: usize) {
         let most: Vec<String> = r
             .top_unclassified
             .iter()
-            .map(|d| format!("{} ({})", d.domain, d.cookie_count))
+            .map(|d| format!("{} ({})", d.domain, d.count))
             .collect();
         println!("Most cookies: {}", most.join(", "));
     }

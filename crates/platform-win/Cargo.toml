@@ -1,0 +1,20 @@
+[package]
+name = "ga-platform-win"
+description = "Thin, audited wrappers over Windows APIs. The only crate allowed to use unsafe."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Threading"] }
+
+# This crate is the single exception to the workspace-wide `forbid(unsafe_code)`,
+# so it does not inherit workspace lints. Every unsafe block needs a SAFETY comment.
+[lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+undocumented_unsafe_blocks = "deny"

@@ -1,0 +1,19 @@
+[package]
+name = "ga-netmon"
+description = "Per-process network monitoring from ETW (DNS lookups first)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ga-core.workspace = true
+
+[target."cfg(windows)".dependencies]
+ferrisetw = "1.2"
+ga-platform-win.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
