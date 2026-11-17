@@ -6,7 +6,10 @@
 //! selected (requirement NFR-5).
 
 pub(crate) mod chromium;
+pub mod delete;
 pub(crate) mod firefox;
+
+pub use delete::{DeleteReport, delete_cookies_in};
 
 use ga_core::{Browser, CookieScan, ScanWarning};
 use std::io;

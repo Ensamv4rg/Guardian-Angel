@@ -1,6 +1,7 @@
 ; Guardian Angel installer hooks (Tauri NSIS).
 ; The installer runs elevated (per-machine install), so it can register the
-; background service and, on uninstall, put back every setting it changed.
+; background service and, on uninstall, put back every setting it changed:
+; privacy settings, DNS blocking (network adapters) and the proxy setting.
 
 !macro NSIS_HOOK_PREINSTALL
   ; Upgrading: stop the running service so its program file can be replaced.
@@ -23,6 +24,8 @@
   DetailPrint "Restoring your Windows settings and removing the service..."
   nsExec::ExecToLog '"$INSTDIR\guardian-service.exe" uninstall'
   Pop $0
+  ; Put this user's proxy setting back if apps were sent through Guardian Angel.
+  ExecWait '"$INSTDIR\guardian-angel.exe" --restore-proxy'
   ; Remove the inspection certificate from this user's trusted list, if it was added.
   nsExec::Exec 'certutil.exe -user -delstore Root "Guardian Angel Local Inspection CA"'
   Pop $0

@@ -117,6 +117,109 @@ fn windowed_pids() -> Vec<u32> {
     ga_platform_win::processes_with_windows().into_iter().collect()
 }
 
+// ---- Windows proxy setting (for inspecting apps that do not take a flag) ----
+
+use ga_platform_win::inet_proxy::{self, PROXY_TYPE_AUTO_PROXY_URL, PROXY_TYPE_DIRECT, PROXY_TYPE_PROXY, ProxySetting};
+
+/// The proxy runs in the service on this port (see the service).
+const INSPECTION_PROXY: &str = "127.0.0.1:8899";
+
+fn pac_url() -> String {
+    format!("http://{INSPECTION_PROXY}/proxy.pac")
+}
+
+/// Where the setting from before is kept, to put it back exactly.
+fn proxy_backup_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|d| std::path::PathBuf::from(d).join("GuardianAngel").join("proxy-before.json"))
+}
+
+fn setting_to_json(s: &ProxySetting) -> Value {
+    json!({ "flags": s.flags, "server": s.server, "bypass": s.bypass, "script_url": s.script_url })
+}
+
+fn setting_from_json(v: &Value) -> ProxySetting {
+    let text = |k: &str| v[k].as_str().map(str::to_owned);
+    ProxySetting {
+        flags: v["flags"].as_u64().and_then(|f| u32::try_from(f).ok()).unwrap_or(PROXY_TYPE_DIRECT),
+        server: text("server"),
+        bypass: text("bypass"),
+        script_url: text("script_url"),
+    }
+}
+
+fn is_ours(s: &ProxySetting) -> bool {
+    s.flags & PROXY_TYPE_AUTO_PROXY_URL != 0 && s.script_url.as_deref() == Some(pac_url().as_str())
+}
+
+/// Whether the service's proxy answers with its setup script.
+fn proxy_answers() -> bool {
+    use std::io::{Read, Write};
+    let Ok(addr) = INSPECTION_PROXY.parse() else { return false };
+    let Ok(mut tcp) = std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(2)) else { return false };
+    let _ = tcp.set_read_timeout(Some(std::time::Duration::from_secs(2)));
+    let request = format!("GET /proxy.pac HTTP/1.1\r\nHost: {INSPECTION_PROXY}\r\nConnection: close\r\n\r\n");
+    let mut reply = String::new();
+    tcp.write_all(request.as_bytes()).is_ok() && tcp.read_to_string(&mut reply).is_ok() && reply.contains("FindProxyForURL")
+}
+
+/// Whether apps are being sent through Guardian Angel, and what was there before.
+#[tauri::command]
+fn system_proxy_status() -> Result<Value, String> {
+    let current = inet_proxy::current_proxy().map_err(|e| e.to_string())?;
+    let other = !is_ours(&current) && current.flags & (PROXY_TYPE_PROXY | PROXY_TYPE_AUTO_PROXY_URL) != 0;
+    Ok(json!({ "on": is_ours(&current), "other_proxy": other, "proxy_running": proxy_answers() }))
+}
+
+/// Points the Windows proxy setting at Guardian Angel's setup script.
+#[tauri::command]
+fn system_proxy_on() -> Result<(), String> {
+    let current = inet_proxy::current_proxy().map_err(|e| e.to_string())?;
+    if is_ours(&current) {
+        return Ok(());
+    }
+    if current.flags & (PROXY_TYPE_PROXY | PROXY_TYPE_AUTO_PROXY_URL) != 0 {
+        return Err("This PC already uses a proxy (often set up by work or school). Guardian Angel will not replace it.".into());
+    }
+    if !proxy_answers() {
+        return Err("The inspection proxy is not running, so nothing was changed. Check that the Guardian Angel service is running.".into());
+    }
+    let path = proxy_backup_path().ok_or("LOCALAPPDATA is not set")?;
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, setting_to_json(&current).to_string()).map_err(|e| e.to_string())?;
+    inet_proxy::set_proxy(&ProxySetting {
+        flags: PROXY_TYPE_DIRECT | PROXY_TYPE_AUTO_PROXY_URL,
+        script_url: Some(pac_url()),
+        ..current
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Puts the Windows proxy setting back as it was. Also run by the
+/// uninstaller (`guardian-angel.exe --restore-proxy`).
+#[tauri::command]
+fn system_proxy_off() -> Result<(), String> {
+    let current = inet_proxy::current_proxy().map_err(|e| e.to_string())?;
+    let path = proxy_backup_path();
+    let before = path
+        .as_ref()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|t| serde_json::from_str::<Value>(&t).ok())
+        .map(|v| setting_from_json(&v));
+    if is_ours(&current) {
+        let restored = before.unwrap_or(ProxySetting {
+            flags: PROXY_TYPE_DIRECT,
+            ..current
+        });
+        inet_proxy::set_proxy(&restored).map_err(|e| e.to_string())?;
+    }
+    if let Some(p) = path {
+        let _ = std::fs::remove_file(p);
+    }
+    Ok(())
+}
+
 /// Updates need the release signing key's public half in the config. Builds
 /// made without it (development, local installers) cannot update themselves.
 fn updates_configured(app: &tauri::AppHandle) -> bool {
@@ -171,6 +274,11 @@ async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 fn main() {
+    // Run by the uninstaller: put the proxy setting back, then exit.
+    if std::env::args().any(|a| a == "--restore-proxy") {
+        let _ = system_proxy_off();
+        return;
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Connection::default())
@@ -182,7 +290,10 @@ fn main() {
             launch_with_proxy,
             windowed_pids,
             check_update,
-            install_update
+            install_update,
+            system_proxy_status,
+            system_proxy_on,
+            system_proxy_off
         ])
         .run(tauri::generate_context!())
         .expect("error while running Guardian Angel");

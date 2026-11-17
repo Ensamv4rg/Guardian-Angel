@@ -58,6 +58,35 @@ pub enum Request {
     ScanAppFully {
         name: String,
     },
+    /// Delete tracking cookies from closed browsers. Cookies of social
+    /// networks and big platforms (which sign you out) only when asked;
+    /// tracking cookies sites set under their own name (Google Analytics'
+    /// `_ga`) unless `site_trackers` is false.
+    DeleteTrackerCookies {
+        include_social: bool,
+        site_trackers: bool,
+    },
+    /// Machine-wide tracker blocking (DNS).
+    BlockingStatus,
+    /// The network adapters turning blocking on would change.
+    BlockingPreview,
+    /// `profile`: "relaxed", "balanced" or "strict".
+    BlockingEnable {
+        profile: String,
+    },
+    BlockingDisable,
+    BlockingSetProfile {
+        profile: String,
+    },
+    BlockingPause {
+        minutes: u32,
+    },
+    BlockingResume,
+    /// Never block this domain (`allow: true`) or take it off that list.
+    BlockingAllow {
+        domain: String,
+        allow: bool,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -289,6 +289,22 @@ async fn serves_a_signed_revocation_list_for_its_certificates() {
     assert_eq!(body[0], 0x30);
 }
 
+#[tokio::test]
+async fn serves_a_setup_script_that_falls_back_to_direct() {
+    let up = fake_upstream().await;
+    let p = start_proxy(&up, Rules::everything(), "x.exe").await;
+    let mut tcp = TcpStream::connect(p.addr).await.unwrap();
+    let request = format!("GET /proxy.pac?v=1 HTTP/1.1\r\nHost: {0}\r\n\r\n", p.addr);
+    tcp.write_all(request.as_bytes()).await.unwrap();
+    let mut buf = Vec::new();
+    tcp.read_to_end(&mut buf).await.unwrap();
+    let text = String::from_utf8_lossy(&buf);
+    assert!(text.starts_with("HTTP/1.1 200"), "{text}");
+    assert!(text.contains("application/x-ns-proxy-autoconfig"));
+    assert!(text.contains(&format!("PROXY {}; DIRECT", p.addr)), "falls back to a direct connection");
+    assert!(text.contains(r#"!= "https:""#), "plain HTTP is not sent to the proxy");
+}
+
 #[test]
 fn ca_is_saved_and_reloaded() {
     let tmp = tempfile::tempdir().unwrap();

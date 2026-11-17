@@ -39,6 +39,26 @@ const MAX_BUFFERED: usize = 8 * 1024 * 1024;
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(10);
 /// Path of the revocation list the proxy serves for its own certificates.
 pub const CRL_PATH: &str = "/guardian-angel.crl";
+/// Path of the proxy setup script Windows' proxy setting points at.
+pub const PAC_PATH: &str = "/proxy.pac";
+
+/// The proxy setup script. Only HTTPS goes through the proxy (plain HTTP is
+/// not proxied), local and private addresses go direct, and "; DIRECT"
+/// means apps connect directly whenever the proxy does not answer, so the
+/// internet keeps working if Guardian Angel stops.
+pub fn pac_script(proxy: SocketAddr) -> String {
+    format!(
+        r#"function FindProxyForURL(url, host) {{
+  if (url.substring(0, 6) != "https:" && url.substring(0, 4) != "wss:") return "DIRECT";
+  if (isPlainHostName(host) || host == "localhost" || dnsDomainIs(host, ".local") ||
+      shExpMatch(host, "127.*") || shExpMatch(host, "10.*") || shExpMatch(host, "192.168.*") ||
+      shExpMatch(host, "169.254.*") || /^172\.(1[6-9]|2[0-9]|3[01])\./.test(host) || host.indexOf(":") >= 0)
+    return "DIRECT";
+  return "PROXY {proxy}; DIRECT";
+}}
+"#
+    )
+}
 /// Headers that apply to one hop only and must not be forwarded.
 const HOP_BY_HOP: &[&str] = &["proxy-connection", "keep-alive", "proxy-authorization", "te", "trailer"];
 
@@ -189,6 +209,16 @@ impl Shared {
             );
             client.write_all(head.as_bytes()).await?;
             client.write_all(&crl).await?;
+            return Ok(());
+        }
+        if method.eq_ignore_ascii_case("GET") && target.split('?').next().is_some_and(|t| t.ends_with(PAC_PATH)) {
+            let pac = pac_script(proxy_addr);
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nCache-Control: no-store\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                pac.len()
+            );
+            client.write_all(head.as_bytes()).await?;
+            client.write_all(pac.as_bytes()).await?;
             return Ok(());
         }
         if !method.eq_ignore_ascii_case("CONNECT") {

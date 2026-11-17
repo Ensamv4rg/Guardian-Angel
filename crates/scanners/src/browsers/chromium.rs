@@ -84,7 +84,7 @@ pub(super) fn scan(roots: &BrowserRoots, scan: &mut CookieScan) {
 }
 
 /// Newer Chromium keeps cookies in `Network\Cookies`; older versions in `Cookies`.
-fn cookie_db(profile_dir: &Path) -> Option<PathBuf> {
+pub(crate) fn cookie_db(profile_dir: &Path) -> Option<PathBuf> {
     [profile_dir.join("Network").join("Cookies"), profile_dir.join("Cookies")]
         .into_iter()
         .find(|p| p.is_file())

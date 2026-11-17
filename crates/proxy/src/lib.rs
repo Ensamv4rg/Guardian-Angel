@@ -7,7 +7,8 @@
 //! app refuses the certificate (pinning), its host is tunnelled from then on.
 //!
 //! This crate never trusts the CA or changes the system proxy itself: both
-//! need the user's consent and belong to the service.
+//! need the user's consent and are done by the desktop app, as the user.
+//! It serves the setup script (`PAC_PATH`) the Windows proxy setting uses.
 
 pub mod ca;
 pub mod rules;
@@ -15,7 +16,7 @@ mod server;
 
 pub use ca::{CA_COMMON_NAME, CaError, CertAuthority};
 pub use rules::Rules;
-pub use server::{AppResolver, InspectedRequest, Proxy, ProxyConfig, ProxyEvent, UpstreamTrust};
+pub use server::{AppResolver, InspectedRequest, PAC_PATH, Proxy, ProxyConfig, ProxyEvent, UpstreamTrust, pac_script};
 
 /// Resolves which program opened a proxy connection, using Windows' TCP
 /// connection table. Returns the executable name, e.g. `Discord.exe`.

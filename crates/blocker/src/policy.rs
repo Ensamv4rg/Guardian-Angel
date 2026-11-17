@@ -6,7 +6,8 @@ use ga_knowledge::TrackerDb;
 use std::collections::BTreeSet;
 
 /// How aggressively to block. Each step adds categories to the one before.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum Profile {
     /// Advertising, data brokers and ad verification. Rarely breaks anything.
     Relaxed,
@@ -98,6 +99,20 @@ impl Policy {
         let d = normalize_host(domain);
         self.block.remove(&d);
         self.allow.insert(d);
+    }
+
+    /// Takes a domain off the allow list.
+    pub fn unallow(&mut self, domain: &str) {
+        self.allow.remove(&normalize_host(domain));
+    }
+
+    /// Domains the user always allows.
+    pub fn allowed(&self) -> impl Iterator<Item = &str> {
+        self.allow.iter().map(String::as_str)
+    }
+
+    pub fn paused_until(&self) -> Option<i64> {
+        self.paused_until_unix
     }
 
     /// Always block this domain and its subdomains (unless protected).

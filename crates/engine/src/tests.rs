@@ -23,6 +23,7 @@ async fn setup() -> Setup {
         proxy_port: 0,
         network_monitor: false,
         app_scan: false,
+        dns_blocking: false,
     })
     .await;
     let data_dir = tmp.path().join("data").join("users").join("test");

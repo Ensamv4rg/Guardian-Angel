@@ -46,7 +46,7 @@ pub struct BlockStats {
 }
 
 pub struct DnsBlocker {
-    socket: Arc<UdpSocket>,
+    sockets: Vec<Arc<UdpSocket>>,
     shared: Arc<Shared>,
 }
 
@@ -54,30 +54,65 @@ struct Shared {
     db: Arc<TrackerDb>,
     policy: Arc<RwLock<Policy>>,
     stats: Arc<Mutex<BlockStats>>,
-    upstreams: Vec<SocketAddr>,
+    upstreams: RwLock<Vec<SocketAddr>>,
+    /// The resolver's own addresses, never used as upstreams.
+    own: Mutex<Vec<SocketAddr>>,
     timeout: Duration,
+}
+
+/// Changes a running resolver: where it forwards, and its statistics.
+#[derive(Clone)]
+pub struct ResolverControl(Arc<Shared>);
+
+impl ResolverControl {
+    /// Replaces the upstream servers, e.g. after joining another network.
+    pub fn set_upstreams(&self, upstreams: Vec<SocketAddr>) {
+        let own = lock(&self.0.own).clone();
+        *self.0.upstreams.write().unwrap_or_else(|p| p.into_inner()) =
+            upstreams.into_iter().filter(|u| !own.contains(u)).collect();
+    }
+
+    pub fn upstreams(&self) -> Vec<SocketAddr> {
+        read(&self.0.upstreams).clone()
+    }
+
+    pub fn stats(&self) -> BlockStats {
+        lock(&self.0.stats).clone()
+    }
 }
 
 impl DnsBlocker {
     pub async fn bind(config: ResolverConfig, db: Arc<TrackerDb>, policy: Arc<RwLock<Policy>>) -> io::Result<Self> {
         let socket = UdpSocket::bind(config.listen).await?;
         let local = socket.local_addr()?;
+        let shared = Arc::new(Shared {
+            db,
+            policy,
+            stats: Arc::default(),
+            upstreams: RwLock::default(),
+            own: Mutex::new(vec![local]),
+            timeout: config.upstream_timeout,
+        });
         // Never forward to ourselves (that would loop forever).
-        let upstreams = config.upstreams.into_iter().filter(|u| *u != local).collect();
+        ResolverControl(shared.clone()).set_upstreams(config.upstreams);
         Ok(Self {
-            socket: Arc::new(socket),
-            shared: Arc::new(Shared {
-                db,
-                policy,
-                stats: Arc::default(),
-                upstreams,
-                timeout: config.upstream_timeout,
-            }),
+            sockets: vec![Arc::new(socket)],
+            shared,
         })
     }
 
+    /// Answers on one more address as well (for example `[::1]:53` next to
+    /// `127.0.0.1:53`), with the same policy and statistics.
+    pub async fn also_listen(&mut self, addr: SocketAddr) -> io::Result<SocketAddr> {
+        let socket = UdpSocket::bind(addr).await?;
+        let local = socket.local_addr()?;
+        lock(&self.shared.own).push(local);
+        self.sockets.push(Arc::new(socket));
+        Ok(local)
+    }
+
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.socket.local_addr()
+        self.sockets[0].local_addr()
     }
 
     /// Live statistics; readable while `run` is going.
@@ -85,30 +120,88 @@ impl DnsBlocker {
         self.shared.stats.clone()
     }
 
-    /// Serves queries until the future is dropped or the socket fails.
+    pub fn control(&self) -> ResolverControl {
+        ResolverControl(self.shared.clone())
+    }
+
+    /// Serves queries until the future is dropped or a socket fails.
     pub async fn run(self) -> io::Result<()> {
         let permits = Arc::new(Semaphore::new(MAX_IN_FLIGHT));
-        let mut buf = vec![0u8; MAX_PACKET];
-        loop {
-            let (len, peer) = match self.socket.recv_from(&mut buf).await {
-                Ok(r) => r,
-                // Windows reports ICMP "port unreachable" from an earlier send
-                // as an error on the next receive; it is not fatal.
-                Err(e) if e.kind() == io::ErrorKind::ConnectionReset => continue,
-                Err(e) => return Err(e),
-            };
-            let Ok(permit) = permits.clone().try_acquire_owned() else { continue };
-            let packet = buf[..len].to_vec();
-            let socket = self.socket.clone();
-            let shared = self.shared.clone();
-            tokio::spawn(async move {
-                if let Some(reply) = shared.handle(&packet).await {
-                    let _ = socket.send_to(&reply, peer).await;
-                }
-                drop(permit);
-            });
+        let mut loops = tokio::task::JoinSet::new();
+        for socket in self.sockets {
+            loops.spawn(serve(socket, self.shared.clone(), permits.clone()));
+        }
+        // The first loop to end (with an error) ends the resolver; dropping
+        // the set stops the others.
+        match loops.join_next().await {
+            Some(Ok(result)) => result,
+            Some(Err(e)) => Err(io::Error::other(e)),
+            None => Ok(()),
         }
     }
+}
+
+async fn serve(socket: Arc<UdpSocket>, shared: Arc<Shared>, permits: Arc<Semaphore>) -> io::Result<()> {
+    let mut buf = vec![0u8; MAX_PACKET];
+    loop {
+        let (len, peer) = match socket.recv_from(&mut buf).await {
+            Ok(r) => r,
+            // Windows reports ICMP "port unreachable" from an earlier send
+            // as an error on the next receive; it is not fatal.
+            Err(e) if e.kind() == io::ErrorKind::ConnectionReset => continue,
+            Err(e) => return Err(e),
+        };
+        let Ok(permit) = permits.clone().try_acquire_owned() else { continue };
+        let packet = buf[..len].to_vec();
+        let socket = socket.clone();
+        let shared = shared.clone();
+        tokio::spawn(async move {
+            if let Some(reply) = shared.handle(&packet).await {
+                let _ = socket.send_to(&reply, peer).await;
+            }
+            drop(permit);
+        });
+    }
+}
+
+/// Asks `server` for the A record of `name` and reports whether it gave a
+/// normal answer in time. Used to check that blocking has not broken DNS.
+pub async fn probe(server: SocketAddr, name: &str, timeout: Duration) -> bool {
+    use hickory_proto::op::Query;
+    use hickory_proto::rr::Name;
+    let Ok(name) = Name::from_ascii(name) else { return false };
+    let mut query = Message::query();
+    query.metadata.id = rand_id();
+    query.metadata.recursion_desired = true;
+    query.add_query(Query::query(name, RecordType::A));
+    let Ok(packet) = query.to_vec() else { return false };
+    let bind: SocketAddr = if server.is_ipv4() {
+        (Ipv4Addr::UNSPECIFIED, 0).into()
+    } else {
+        (Ipv6Addr::UNSPECIFIED, 0).into()
+    };
+    let attempt = async {
+        let sock = UdpSocket::bind(bind).await.ok()?;
+        sock.connect(server).await.ok()?;
+        sock.send(&packet).await.ok()?;
+        let mut buf = vec![0u8; MAX_PACKET];
+        loop {
+            let len = sock.recv(&mut buf).await.ok()?;
+            if let Ok(reply) = Message::from_vec(&buf[..len])
+                && reply.metadata.id == query.metadata.id
+            {
+                return Some(reply.metadata.response_code == ResponseCode::NoError);
+            }
+        }
+    };
+    matches!(tokio::time::timeout(timeout, attempt).await, Ok(Some(true)))
+}
+
+fn rand_id() -> u16 {
+    use std::hash::{BuildHasher, Hasher};
+    let mut h = std::collections::hash_map::RandomState::new().build_hasher();
+    h.write_u128(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0));
+    h.finish() as u16
 }
 
 impl Shared {
@@ -147,7 +240,8 @@ impl Shared {
     /// whose transaction ID matches.
     async fn forward(&self, packet: &[u8]) -> Option<Vec<u8>> {
         let id = packet.get(..2)?;
-        for upstream in &self.upstreams {
+        let upstreams = read(&self.upstreams).clone();
+        for upstream in &upstreams {
             let bind: SocketAddr = if upstream.is_ipv4() {
                 (Ipv4Addr::UNSPECIFIED, 0).into()
             } else {

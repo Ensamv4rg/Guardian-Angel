@@ -29,6 +29,9 @@ pub struct EngineConfig {
     pub network_monitor: bool,
     /// The app scan reads installed apps and takes a minute or more.
     pub app_scan: bool,
+    /// Machine-wide DNS blocking may change Windows' network settings
+    /// (needs administrator rights: the installed service).
+    pub dns_blocking: bool,
 }
 
 pub struct Engine {
@@ -39,6 +42,7 @@ pub struct Engine {
     started: Instant,
     network: Mutex<NetworkState>,
     proxy: ProxyState,
+    blocking: Arc<crate::blocking::Blocking>,
 }
 
 enum NetworkState {
@@ -102,6 +106,19 @@ impl Engine {
         };
 
         let proxy = start_proxy(&config).await;
+        let blocking = crate::blocking::Blocking::load(&config.data_root, db.clone());
+        if config.dns_blocking {
+            blocking.resume_after_start().await;
+            let b = blocking.clone();
+            tokio::spawn(async move {
+                let mut every = tokio::time::interval(crate::blocking::CHECK_EVERY);
+                every.tick().await;
+                loop {
+                    every.tick().await;
+                    b.check().await;
+                }
+            });
+        }
         Arc::new(Self {
             config,
             db,
@@ -110,7 +127,70 @@ impl Engine {
             started: Instant::now(),
             network: Mutex::new(network),
             proxy,
+            blocking,
         })
+    }
+
+    /// The service is stopping: put Windows' network settings back (blocking
+    /// resumes when it starts again).
+    pub async fn shutdown(&self) {
+        if self.config.dns_blocking {
+            self.blocking.shutdown().await;
+        }
+    }
+
+    fn blocking_allowed(&self) -> Result<(), String> {
+        if self.config.dns_blocking {
+            Ok(())
+        } else {
+            Err("Blocking works when Guardian Angel runs as an installed service.".into())
+        }
+    }
+
+    /// Deletes tracking cookies from browsers that are closed, then rereads
+    /// the cookies so the Trackers page updates.
+    fn delete_tracker_cookies(&self, slot: &UserSlot, include_social: bool, site_trackers: bool) -> Value {
+        use ga_core::{Browser, Category};
+        // Browsers of this user that are running keep their cookies in memory.
+        const EXES: &[(&str, Browser)] = &[
+            ("chrome.exe", Browser::Chrome),
+            ("msedge.exe", Browser::Edge),
+            ("brave.exe", Browser::Brave),
+            ("vivaldi.exe", Browser::Vivaldi),
+            ("opera.exe", Browser::Opera),
+            ("firefox.exe", Browser::Firefox),
+        ];
+        let mut open: Vec<Browser> = Vec::new();
+        for p in ga_platform_win::running_processes() {
+            let Some((_, browser)) = EXES.iter().find(|(exe, _)| p.exe.eq_ignore_ascii_case(exe)) else { continue };
+            let mine = match &slot.ctx.sid {
+                Some(sid) => ga_platform_win::process_user_sid(p.pid).as_deref() == Some(sid.as_str()),
+                None => true,
+            };
+            if mine && !open.contains(browser) {
+                open.push(*browser);
+                // Opera GX runs as opera.exe too.
+                if *browser == Browser::Opera {
+                    open.push(Browser::OperaGx);
+                }
+            }
+        }
+        let db = self.db.clone();
+        let rule = move |host: &str, name: &str| {
+            if let Some(m) = db.classify(host) {
+                return match m.category {
+                    // Signing-in sites: deleting signs the user out.
+                    Category::Social | Category::Platform => include_social,
+                    _ => true,
+                };
+            }
+            site_trackers && ga_report::purpose::identify(name).0 == ga_report::purpose::CookiePurpose::Tracking
+        };
+        let report = ga_scanners::browsers::delete_cookies_in(&slot.ctx.browser_roots, &open, &rule);
+        // Show the result straight away.
+        let cookies = ga_scanners::browsers::scan_cookies_in(&slot.ctx.browser_roots);
+        lock(&slot.state).cookies = Some(ga_report::build_cookie_report(&cookies, &self.db));
+        json!(report)
     }
 
     /// The state slot for a user, created (and loaded from disk) on first use.
@@ -204,6 +284,27 @@ impl Engine {
                 Ok(json!(events))
             }
             Request::RunningApps => Ok(self.running_apps(&slot.ctx)),
+            Request::DeleteTrackerCookies { include_social, site_trackers } => {
+                Ok(self.delete_tracker_cookies(&slot, include_social, site_trackers))
+            }
+            Request::BlockingStatus => Ok(self.blocking.status().await),
+            Request::BlockingPreview => Ok(self.blocking.preview().await),
+            Request::BlockingEnable { profile } => {
+                self.blocking_allowed()?;
+                self.blocking.enable(crate::blocking::profile_from(&profile)?).await
+            }
+            Request::BlockingDisable => Ok(self.blocking.disable().await),
+            Request::BlockingSetProfile { profile } => {
+                Ok(self.blocking.set_profile(crate::blocking::profile_from(&profile)?).await)
+            }
+            Request::BlockingPause { minutes } => Ok(self.blocking.pause(minutes.clamp(1, 24 * 60)).await),
+            Request::BlockingResume => Ok(self.blocking.resume().await),
+            Request::BlockingAllow { domain, allow } => {
+                if ga_core::normalize_host(&domain).is_empty() {
+                    return Err("Enter a domain, for example example.com".into());
+                }
+                Ok(self.blocking.allow(&domain, allow).await)
+            }
             Request::ScanAppFully { name } => {
                 let known = lock(&slot.state)
                     .apps

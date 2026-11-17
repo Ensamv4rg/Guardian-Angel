@@ -180,3 +180,11 @@ select.text {
 .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--accent-soft); color: var(--accent); border-radius: 14px; padding: 3px 4px 3px 12px; font-size: 13px; }
 .chip button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 6px; border-radius: 10px; }
 .chip button:hover { background: var(--panel); }
+
+/* Blocking: level choice and consent */
+.choices { display: grid; gap: 8px; margin: 12px 0 16px; }
+.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.choice.selected { border-color: var(--accent); background: var(--accent-soft); }
+.choice input { margin-top: 3px; }
+.consent { border: 1px solid var(--accent); border-radius: 8px; padding: 14px 16px; }
+.consent ul { margin: 6px 0 12px; padding-left: 20px; }

@@ -110,3 +110,32 @@ fn unreadable_database_becomes_a_warning() {
     assert_eq!(scan.warnings.len(), 1);
     assert_eq!(scan.warnings[0].browser, Browser::Chrome);
 }
+
+#[test]
+fn deletes_only_chosen_cookies_and_skips_open_browsers() {
+    let tmp = tempfile::tempdir().unwrap();
+    let local = tmp.path().join("Local");
+    let roaming = tmp.path().join("Roaming");
+    make_chromium_db(&local.join(r"Google\Chrome\User Data\Default\Network\Cookies"));
+    make_chromium_db(&local.join(r"Microsoft\Edge\User Data\Default\Network\Cookies"));
+    make_firefox_db(&roaming.join(r"Mozilla\Firefox\Profiles\ab12.default-release\cookies.sqlite"));
+    let roots = BrowserRoots {
+        local_app_data: Some(local),
+        app_data: Some(roaming),
+    };
+
+    // Edge is "open": left alone. Delete tracker hosts and any `_ga`.
+    let rule = |host: &str, name: &str| host.ends_with("doubleclick.net") || name == "_ga";
+    let report = delete_cookies_in(&roots, &[Browser::Edge], &rule);
+    assert_eq!(report.deleted, 2, "Chrome's IDE and Firefox's _ga");
+    assert_eq!(report.profiles.len(), 2);
+    assert_eq!(report.skipped.len(), 1);
+    assert_eq!(report.skipped[0].browser, Browser::Edge);
+
+    let scan = scan_cookies_in(&roots);
+    let left: Vec<(Browser, &str)> = scan.cookies.iter().map(|c| (c.browser, c.name.as_str())).collect();
+    assert!(left.contains(&(Browser::Chrome, "session")), "other cookies stay");
+    assert!(!left.contains(&(Browser::Chrome, "IDE")));
+    assert!(left.contains(&(Browser::Edge, "IDE")), "the open browser was not touched");
+    assert!(!left.iter().any(|(b, _)| *b == Browser::Firefox));
+}

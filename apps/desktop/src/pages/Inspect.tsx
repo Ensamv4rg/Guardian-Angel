@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PageProps } from "../App";
 import { call, errorText, isDesktopApp, native } from "../api";
 import { Badge, Card, Empty, ErrorNotice, PageHead, Tip } from "../components";
-import type { InspectedRequest, ProxyStatus, RunningApp } from "../types";
+import type { InspectedRequest, ProxyStatus, RunningApp, SystemProxyStatus } from "../types";
 
 /** Plain words for each kind of data, most sensitive first (matches ga-core DataKind). */
 const KIND: Record<string, string> = {
@@ -55,14 +55,19 @@ export default function InspectPage() {
   const checkTrust = useCallback(async () => {
     if (isDesktopApp) setTrusted(await native<boolean>("certificate_trusted").catch(() => false));
   }, []);
+  const [systemProxy, setSystemProxy] = useState<SystemProxyStatus | null>(null);
+  const checkSystemProxy = useCallback(async () => {
+    if (isDesktopApp) setSystemProxy(await native<SystemProxyStatus>("system_proxy_status").catch(() => null));
+  }, []);
 
   useEffect(() => {
     load();
     loadRunning();
     checkTrust();
+    checkSystemProxy();
     const id = setInterval(load, 3000);
     return () => clearInterval(id);
-  }, [load, loadRunning, checkTrust]);
+  }, [load, loadRunning, checkTrust, checkSystemProxy]);
 
   const run = async (action: () => Promise<unknown>, success?: string) => {
     setError(null);
@@ -97,6 +102,17 @@ export default function InspectPage() {
       await native("remove_certificate");
       await checkTrust();
     }, "Certificate removed. Guardian Angel can no longer read any app's encrypted traffic.");
+
+  const proxyOn = () =>
+    run(async () => {
+      await native("system_proxy_on");
+      await checkSystemProxy();
+    }, "Apps now send their encrypted traffic through Guardian Angel. Restart the apps you picked so they notice.");
+  const proxyOff = () =>
+    run(async () => {
+      await native("system_proxy_off");
+      await checkSystemProxy();
+    }, "Your proxy setting is back as it was.");
 
   const proxy = status?.listening ?? "127.0.0.1:8899";
   const chosenApps = chosen.map((exe) => ({ exe, app: running.find((r) => r.exe.toLowerCase() === exe) }));
@@ -199,34 +215,51 @@ export default function InspectPage() {
             </div>
           </div>
 
-          <div className="step">
+          <div className={`step ${systemProxy?.on ? "done" : ""}`}>
             <div>
               <h3>
-                Restart the app through Guardian Angel
-                <Tip text="Apps only send their traffic through Guardian Angel when started this way. Close the app completely first; it then opens again with inspection on. Restarting it normally turns inspection off." />
+                Send app traffic through Guardian Angel
+                <Tip text="Turns on Windows' proxy setting for your account, pointing at Guardian Angel. Only the apps you picked are read; everything else, including your browser, passes straight through untouched. If Guardian Angel stops, apps connect directly as before. Turning it off puts your old setting back." />
               </h3>
-              {chosenApps.length === 0 ? (
-                <span className="muted">Pick an app first.</span>
+              {!isDesktopApp ? (
+                <span className="muted">Available in the Guardian Angel desktop app.</span>
+              ) : systemProxy?.other_proxy ? (
+                <span className="muted small">This PC already uses a proxy (often set up by work or school), so Guardian Angel leaves it alone. Electron apps can still be restarted with inspection below.</span>
+              ) : systemProxy?.on ? (
+                <div className="row">
+                  <Badge tone="good">On</Badge>
+                  <button className="btn" onClick={proxyOff}>Turn off</button>
+                  <span className="muted small">Restart an app after picking it, so it uses the setting.</span>
+                </div>
               ) : (
-                chosenApps.map(({ exe, app }) => (
-                  <div key={exe} className="row" style={{ marginBottom: 6 }}>
-                    <b style={{ minWidth: 160 }}>{app?.name ?? exe}</b>
-                    {!app ? (
-                      <span className="muted small">Not running right now. Open it, then press Refresh above.</span>
-                    ) : app.electron ? (
-                      <button className="btn" disabled={!isDesktopApp || !trusted} onClick={() => relaunch(app)}>
-                        Restart with inspection
-                      </button>
-                    ) : (
-                      <span className="muted small">
-                        This app does not support one-click inspection yet; it will work once Guardian Angel can use the Windows proxy setting.
-                      </span>
-                    )}
-                  </div>
-                ))
+                <div className="row">
+                  <button className="btn primary" disabled={!trusted} onClick={proxyOn} title={trusted ? undefined : "Allow step 2 first"}>
+                    Turn on
+                  </button>
+                  <span className="muted small">Works for most apps. Then restart the apps you picked.</span>
+                </div>
+              )}
+              {chosenApps.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {chosenApps.map(({ exe, app }) => (
+                    <div key={exe} className="row" style={{ marginBottom: 6 }}>
+                      <b style={{ minWidth: 160 }}>{app?.name ?? exe}</b>
+                      {!app ? (
+                        <span className="muted small">Not running right now. Open it after turning this on.</span>
+                      ) : app.electron ? (
+                        <button className="btn" disabled={!isDesktopApp || !trusted} onClick={() => relaunch(app)}>
+                          Restart with inspection
+                        </button>
+                      ) : (
+                        <span className="muted small">Close and reopen it to start inspection.</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
+
         </div>
       </Card>
 

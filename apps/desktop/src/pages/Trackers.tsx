@@ -1,8 +1,74 @@
+import { useState } from "react";
 import type { PageProps } from "../App";
-import { Badge, Bar, Card, Empty, PageHead, Tip, Waiting, categoryLabel, fmt } from "../components";
-import type { CookiePurpose, CookieReport } from "../types";
+import { call, errorText } from "../api";
+import { Badge, Bar, Card, Empty, ErrorNotice, PageHead, Tip, Waiting, categoryLabel, fmt } from "../components";
+import type { CookieDeleteReport, CookiePurpose, CookieReport } from "../types";
 
-export default function TrackersPage({ overview }: PageProps) {
+/** Deletes tracking cookies from closed browsers, after the user confirms. */
+function DeleteCookiesCard({ trackerCookies, refresh }: { trackerCookies: number; refresh: () => Promise<void> }) {
+  const [social, setSocial] = useState(false);
+  const [siteTrackers, setSiteTrackers] = useState(true);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState<CookieDeleteReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      setReport(await call<CookieDeleteReport>("delete_tracker_cookies", { include_social: social, site_trackers: siteTrackers }));
+      setConfirming(false);
+      await refresh();
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Delete tracking cookies">
+      <ErrorNotice message={error} />
+      <p style={{ marginTop: 0 }}>
+        Removes cookies that tracking companies use to recognise you. You stay signed in to your accounts.
+        <Tip text="Trackers set new cookies the next time you visit a site that uses them. Turn on Blocking to stop that." />
+      </p>
+      <label className="row small">
+        <input type="checkbox" checked={siteTrackers} onChange={(e) => setSiteTrackers(e.target.checked)} />
+        Also tracking cookies sites set under their own name (such as Google Analytics' _ga)
+      </label>
+      <label className="row small" style={{ marginTop: 6 }}>
+        <input type="checkbox" checked={social} onChange={(e) => setSocial(e.target.checked)} />
+        Also social media and big platforms (Facebook, Google, LinkedIn...). <b>This signs you out of them.</b>
+      </label>
+      <div className="row" style={{ marginTop: 12 }}>
+        {!confirming ? (
+          <button className="btn primary" disabled={trackerCookies === 0 && !siteTrackers} onClick={() => setConfirming(true)}>
+            Delete tracking cookies...
+          </button>
+        ) : (
+          <>
+            <span>Close your browsers first; open ones are skipped. This cannot be undone.</span>
+            <button className="btn primary" disabled={busy} onClick={remove}>{busy ? "Deleting..." : "Delete"}</button>
+            <button className="btn" disabled={busy} onClick={() => setConfirming(false)}>Cancel</button>
+          </>
+        )}
+      </div>
+      {report && (
+        <div className="notice info" style={{ marginTop: 12 }}>
+          Deleted {fmt(report.deleted)} cookie{report.deleted === 1 ? "" : "s"}
+          {report.profiles.length > 0 && ` (${report.profiles.map((p) => `${p.browser} ${p.profile}: ${fmt(p.deleted)}`).join(", ")})`}.
+          {report.skipped.map((s) => (
+            <div key={s.browser}>{s.reason}</div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+export default function TrackersPage({ overview, refresh }: PageProps) {
   const c = overview?.cookies;
   if (!c) return <Waiting what="Reading browser cookies..." />;
   const max = c.companies[0]?.cookie_count ?? 0;
@@ -20,6 +86,7 @@ export default function TrackersPage({ overview }: PageProps) {
           Close it and scan again to include {c.warnings.length === 1 ? "it" : "them"}.
         </div>
       )}
+      <DeleteCookiesCard trackerCookies={c.tracker_cookies} refresh={refresh} />
       <Card>
         {c.companies.length === 0 ? (
           <Empty>No known tracking companies found.</Empty>

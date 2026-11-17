@@ -147,3 +147,27 @@ export interface ProxyStatus {
   refused_inspection: string[];
   recent_requests: number;
 }
+
+export interface CookieDeleteReport {
+  deleted: number;
+  profiles: { browser: string; profile: string; deleted: number }[];
+  skipped: { browser: string; reason: string }[];
+}
+
+export type BlockingProfile = "relaxed" | "balanced" | "strict";
+export interface BlockingStatus {
+  enabled: boolean;
+  running: boolean;
+  profile: BlockingProfile;
+  paused_until: number | null;
+  adapters: string[];
+  upstreams: string[];
+  queries: number;
+  blocked: number;
+  top_companies: { company: string; blocked: number }[];
+  allowed: string[];
+  error: string | null;
+  notice: string | null;
+}
+export interface BlockingPreview { adapters: { name: string; current: string }[] }
+export interface SystemProxyStatus { on: boolean; other_proxy: boolean; proxy_running: boolean }

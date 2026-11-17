@@ -1,16 +1,17 @@
 # Guardian Angel
 
-Guardian Angel shows who is collecting data from your Windows PC, explains it in plain language, and lets you block or fix it with one click. Everything is analysed on your computer; nothing is sent anywhere.
+Guardian Angel shows who is collecting data from your Windows PC, explains it in plain language, and lets you block or fix it with one click. Your data is analysed on your computer and never leaves it.
 
 ## What it does
 
 | Area | What you see |
 | --- | --- |
 | **Overview** | A privacy score out of 100, with the reasons it is not 100, and live scan progress |
-| **Trackers** | Companies with cookies in your browsers, plus what every other cookie is for, including tracking tools hiding under websites' own names |
+| **Trackers** | Companies with cookies in your browsers, plus what every other cookie is for, including tracking tools hiding under websites' own names. Delete tracking cookies while staying signed in |
 | **Apps** | Tracking and telemetry SDKs built into your desktop apps (Sentry, App Center, Mixpanel, Segment, Firebase and more) |
 | **Network** | Which programs contact which tracking companies, live |
 | **Inspect traffic** | Exactly what an app you pick sends to trackers, decoded into plain language |
+| **Blocking** | Stops every app and browser on the PC from reaching tracking companies (three levels, pause, never-block list) |
 | **Extensions** | Browser extensions and what each one can read |
 | **Windows settings** | Settings that share your data, with a fix button and undo for each |
 | **Alerts** | What got worse since the last scan: a new risky extension, a setting switched back on, a new SDK in an app |
@@ -24,7 +25,7 @@ Download `GuardianAngel-Setup-<version>.exe` from the [Releases](../../releases)
 - installs the app and its background service, which starts with Windows
 - opens Guardian Angel when it finishes
 
-To remove it, use **Settings > Apps > Guardian Angel > Uninstall**. This restores the Windows settings Guardian Angel changed, removes its inspection certificate if you allowed one, and deletes its data.
+To remove it, use **Settings > Apps > Guardian Angel > Uninstall**. This restores the Windows settings Guardian Angel changed (privacy settings, network DNS settings and the proxy setting), removes its inspection certificate if you allowed one, and deletes its data.
 
 Requirements: Windows 10 (22H2) or Windows 11, 64-bit.
 
@@ -37,7 +38,7 @@ Requirements: Windows 10 (22H2) or Windows 11, 64-bit.
  Background service (Rust, runs as SYSTEM)
    scanners: cookies, extensions, settings, app SDKs
    network monitor (Windows DNS events)    inspection proxy (opt-in, per app)
-   blocking DNS resolver (not yet active)  settings fixes with an undo journal
+   blocking DNS resolver (opt-in)          settings fixes with an undo journal
 ```
 
 - The service answers each request for the Windows user who asked, from that user's own profile and registry, so one user never sees another's data.
@@ -153,7 +154,9 @@ Add `--json` to most commands for machine-readable output.
 
 ## Known gaps
 
-- **Not yet on:** blocking (the DNS resolver works but Windows is not pointed at it) and inspecting apps that do not take a proxy flag (needs the Windows proxy setting). Both need a consent step with automatic rollback.
+- **Blocking:** works through DNS, so browsers with Secure DNS (DNS over HTTPS) turned on skip it for websites, and apps that bring their own DNS are not covered. Changing the network setting needs the installed service. It is machine-wide: any signed-in user can turn it on or off.
+- **Windows proxy:** only apps that follow Windows' proxy setting can be inspected that way (most do; some games and command-line tools do not). Not used when another proxy (work or school) is set. VPN and dial-up connections keep their own setting.
+- **Cookie deletion:** needs the browser closed; open browsers are skipped. It cannot be undone.
 - **Code signing:** the installer and app are not signed yet, so Windows SmartScreen warns on first run.
 - **Testing:** tested on Windows 10 22H2. Needs Windows 11 and Home / Pro / Enterprise runs, and the installed service needs a full test as SYSTEM.
 - **Network monitor:** sees lookups through the Windows DNS client only; browsers using Secure DNS bypass it. Data volumes per program are not measured yet.

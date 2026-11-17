@@ -11,6 +11,8 @@ pub mod context;
 pub mod score;
 
 #[cfg(windows)]
+pub mod blocking;
+#[cfg(windows)]
 mod engine;
 
 pub use context::UserContext;

@@ -48,7 +48,13 @@ fn run_console() -> Result<(), BoxError> {
     let ctx = Arc::new(UserContext::current(&data_root));
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(async {
-        let engine = Engine::start(config(data_root)).await;
+        // Console mode runs as the signed-in user, who cannot change the
+        // network settings; blocking needs the installed service.
+        let engine = Engine::start(EngineConfig {
+            dns_blocking: false,
+            ..config(data_root)
+        })
+        .await;
         println!("Guardian Angel engine running in console mode on {PIPE_NAME}. Press Ctrl+C to stop.");
         serve(engine, Mode::Console(ctx), async {
             let _ = tokio::signal::ctrl_c().await;
@@ -63,6 +69,7 @@ fn config(data_root: PathBuf) -> EngineConfig {
         proxy_port: PROXY_PORT,
         network_monitor: true,
         app_scan: true,
+        dns_blocking: true,
     }
 }
 
@@ -149,10 +156,13 @@ fn run_service() -> Result<(), BoxError> {
     let result =tokio::runtime::Runtime::new().map_err(BoxError::from).and_then(|rt| {
         rt.block_on(async {
             let engine = Engine::start(config(data_root.clone())).await;
-            serve(engine, Mode::Service { data_root }, async {
+            let served = serve(engine.clone(), Mode::Service { data_root }, async {
                 let _ = stop_rx.await;
             })
-            .await
+            .await;
+            // Put the network settings back before the process ends.
+            engine.shutdown().await;
+            served
         })
     });
 
@@ -238,6 +248,12 @@ fn install() -> Result<(), BoxError> {
         Err(_) => manager.create_service(&info, access)?,
     };
     service.set_description(DESCRIPTION)?;
+    // Restart after a crash, so blocking comes back (the original DNS server
+    // stays second on each adapter, so the internet works in between).
+    run_quiet(
+        "sc.exe",
+        &["failure", SERVICE_NAME, "reset=", "86400", "actions=", "restart/5000/restart/5000/restart/60000"],
+    );
     secure_data_root(&service_data_root());
     service.start::<&str>(&[])?;
     println!("Installed and started the {SERVICE_NAME} service.");
@@ -255,6 +271,10 @@ fn uninstall() -> Result<(), BoxError> {
     if let Ok(service) = &service {
         let _ = service.stop();
         wait_until_stopped(service);
+    }
+    // The service puts DNS back when it stops; this covers a crashed one.
+    for name in ga_engine::blocking::restore_from_disk(&service_data_root()) {
+        println!("Restored the DNS setting of {name}.");
     }
 
     let users = service_data_root().join("users");

@@ -1,6 +1,6 @@
 //! Turns raw scan results into a report grouped by company (requirement FR-6).
 
-mod purpose;
+pub mod purpose;
 
 pub use purpose::{CookiePurpose, identify as cookie_purpose};
 
