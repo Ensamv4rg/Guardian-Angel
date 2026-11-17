@@ -190,13 +190,21 @@ fn run_quiet(program: &str, args: &[&str]) -> bool {
 
 /// Only SYSTEM and administrators may read the data folder (ProgramData is
 /// readable by every user by default, and it holds the CA key).
+///
+/// The folder itself gets the two grants; everything inside is reset to
+/// inherit them. (Applying the grants with `/T` instead strips every
+/// permission from files, since folder inheritance flags do not apply to
+/// files: an earlier version locked even SYSTEM out of its own CA key after
+/// a restart. The reset also repairs those files.)
 fn secure_data_root(root: &Path) {
     let _ = std::fs::create_dir_all(root);
+    let inside = root.join("*");
     let root = root.to_string_lossy();
     run_quiet(
         "icacls",
-        &[&root, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", "/T", "/Q"],
+        &[&root, "/inheritance:r", "/grant:r", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F", "/Q"],
     );
+    run_quiet("icacls", &[&inside.to_string_lossy(), "/reset", "/T", "/C", "/Q"]);
 }
 
 /// Lets one user read (not change) their own folder: their exported
