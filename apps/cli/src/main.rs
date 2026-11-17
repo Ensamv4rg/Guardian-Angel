@@ -38,6 +38,9 @@ enum Command {
         /// Also list apps where nothing was found.
         #[arg(long)]
         all: bool,
+        /// Scan only this folder, reading every file in it.
+        #[arg(long)]
+        dir: Option<std::path::PathBuf>,
     },
     /// List browser extensions and what they can access.
     Extensions {
@@ -144,10 +147,16 @@ fn main() -> Result<()> {
                 print_report(&report, top);
             }
         }
-        Command::Apps { json, all } => {
+        Command::Apps { json, all, dir } => {
             let db = TrackerDb::bundled().context("loading the tracker list")?;
             let started = std::time::Instant::now();
-            let scan = ga_scanners::apps::scan_apps(&db);
+            let scan = match dir {
+                Some(dir) => ga_core::AppScan {
+                    apps: vec![ga_scanners::apps::scan_folder(&dir, &ga_scanners::apps::matcher::Matcher::bundled(&db))],
+                    warnings: Vec::new(),
+                },
+                None => ga_scanners::apps::scan_apps(&db),
+            };
             if json {
                 println!("{}", serde_json::to_string_pretty(&scan)?);
             } else {

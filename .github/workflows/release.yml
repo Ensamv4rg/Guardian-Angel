@@ -88,6 +88,24 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: ./scripts/build-installer.ps1
 
+      # Guardian Angel's own programs must not look like they contain
+      # trackers. Its tracker lists are stored compressed for this reason;
+      # this catches an address that slips into the code as plain text.
+      - name: Check Guardian Angel scans clean
+        run: |
+          cargo build --release -p ga-cli
+          if ($LASTEXITCODE -ne 0) { throw "CLI build failed" }
+          $dir = Join-Path $env:RUNNER_TEMP "self-scan"
+          New-Item -ItemType Directory -Force $dir | Out-Null
+          Copy-Item target/release/guardian-angel.exe, target/release/guardian-service.exe $dir
+          $app = (./target/release/guardian.exe apps --dir $dir --json | ConvertFrom-Json).apps[0]
+          if ($app.bytes_scanned -eq 0) { throw "The self-scan read nothing" }
+          if ($app.findings.Count -gt 0) {
+            $app.findings | ForEach-Object { Write-Host "::error::$($_.sdk): $($_.evidence -join '; ')" }
+            throw "Guardian Angel's own programs contain tracker addresses"
+          }
+          Write-Host "Clean: $($app.bytes_scanned) bytes read, no tracker findings."
+
       - name: Name the installer
         id: installer
         run: |

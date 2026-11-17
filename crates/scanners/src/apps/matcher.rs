@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use std::io::{self, Read};
 use std::path::Path;
 
-const BUNDLED_CATALOG: &str = include_str!("../../../../data/sources/sdk_signatures.json");
+
 
 /// Tracker-list domains shorter than this are too likely to match unrelated
 /// text (e.g. `t.co`), so they are not searched for in code.
@@ -63,7 +63,7 @@ pub type Found = HashMap<usize, String>;
 
 impl Matcher {
     pub fn bundled(db: &TrackerDb) -> Self {
-        Self::new(BUNDLED_CATALOG, db).expect("bundled SDK catalog must be valid")
+        Self::new(ga_knowledge::bundled_sdk_catalog(), db).expect("bundled SDK catalog must be valid")
     }
 
     pub fn new(catalog_json: &str, db: &TrackerDb) -> Result<Self, serde_json::Error> {

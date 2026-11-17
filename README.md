@@ -119,7 +119,7 @@ Tests never change your system. One registry test writes to a scratch key and is
 | `guardian cookies` | Browser cookies by company (close browsers first; they lock their cookie files) |
 | `guardian extensions` | Browser extensions and their risk |
 | `guardian privacy` | Windows privacy settings and camera, microphone and location use |
-| `guardian apps` | SDKs in installed apps |
+| `guardian apps` | SDKs in installed apps; `--dir <folder>` reads every file in one folder |
 | `guardian network --seconds 60` | Live DNS lookups by program and company |
 | `guardian fix --all` | Shows what would change; add `--apply` to change settings |
 | `guardian undo` | Lists changes; `undo <id>` or `undo --all` reverses them |

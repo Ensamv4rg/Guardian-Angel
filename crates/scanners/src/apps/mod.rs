@@ -80,6 +80,18 @@ pub fn scan_one_app(
     merge_same_name(apps).into_iter().next()
 }
 
+/// Scans one folder as if it were an installed app, reading every file.
+/// For checking a single program (`guardian apps --dir`).
+pub fn scan_folder(dir: &std::path::Path, matcher: &Matcher) -> ga_core::InstalledApp {
+    let candidate = Candidate {
+        name: dir.file_name().map_or_else(|| dir.display().to_string(), |n| n.to_string_lossy().into_owned()),
+        publisher: None,
+        version: None,
+        dir: dir.to_path_buf(),
+    };
+    inspect::inspect(&candidate, matcher, Limits::everything())
+}
+
 /// The same product installed twice (32- and 64-bit, or per-user and
 /// per-machine) is shown once, with the findings of both.
 fn merge_same_name(apps: Vec<ga_core::InstalledApp>) -> Vec<ga_core::InstalledApp> {

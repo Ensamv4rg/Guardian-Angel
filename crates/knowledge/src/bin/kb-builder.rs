@@ -11,10 +11,10 @@ fn main() {
     };
     let result = std::fs::read_to_string(input)
         .map_err(|e| format!("cannot read {input}: {e}"))
-        .and_then(|tds| ga_knowledge::ddg::convert(&tds, ga_knowledge::BUNDLED_SEED).map_err(|e| e.to_string()))
+        .and_then(|tds| ga_knowledge::ddg::convert(&tds, ga_knowledge::bundled_seed()).map_err(|e| e.to_string()))
         .and_then(|json| {
             // Check the result loads together with the seed before writing it.
-            ga_knowledge::TrackerDb::from_sources(&[ga_knowledge::BUNDLED_SEED, &json]).map_err(|e| e.to_string())?;
+            ga_knowledge::TrackerDb::from_sources(&[ga_knowledge::bundled_seed(), &json]).map_err(|e| e.to_string())?;
             std::fs::write(output, &json).map_err(|e| format!("cannot write {output}: {e}"))
         });
     if let Err(e) = result {
