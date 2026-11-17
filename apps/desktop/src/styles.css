@@ -188,3 +188,9 @@ select.text {
 .choice input { margin-top: 3px; }
 .consent { border: 1px solid var(--accent); border-radius: 8px; padding: 14px 16px; }
 .consent ul { margin: 6px 0 12px; padding-left: 20px; }
+/* Tabs and the data request letter */
+.tabs { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid var(--line); margin: 8px 0 16px; flex-wrap: wrap; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 12px; font: inherit; color: var(--muted); cursor: pointer; }
+.tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.small-btn { padding: 4px 10px; font-size: 13px; }
+textarea.letter { width: 100%; box-sizing: border-box; font-family: inherit; line-height: 1.45; margin-top: 6px; resize: vertical; }

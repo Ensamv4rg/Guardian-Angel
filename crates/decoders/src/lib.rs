@@ -4,6 +4,8 @@
 //! HAR file sees it. Output says which company received which kinds of data.
 //! Unknown parameters are left out rather than guessed at.
 
+pub mod consent;
+mod generic;
 mod google;
 pub mod har;
 mod meta;
@@ -44,6 +46,13 @@ pub fn decode(request: &Request<'_>) -> Vec<DecodedPayload> {
         .iter()
         .find_map(|d| d(&parsed))
         .unwrap_or_default()
+}
+
+pub use generic::summarize;
+
+/// Privacy choices carried in a request (consent strings and similar).
+pub fn consent_signals(request: &Request<'_>) -> Vec<ga_core::ConsentSignal> {
+    consent::signals(request)
 }
 
 /// Products this crate can decode, for "what we understand" in the UI.

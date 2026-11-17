@@ -4,25 +4,7 @@ import { call, errorText, isDesktopApp, native } from "../api";
 import { Badge, Card, Empty, ErrorNotice, PageHead, Tip } from "../components";
 import type { InspectedRequest, ProxyStatus, RunningApp, SystemProxyStatus } from "../types";
 
-/** Plain words for each kind of data, most sensitive first (matches ga-core DataKind). */
-const KIND: Record<string, string> = {
-  Email: "your email address",
-  HashedEmail: "your email address (scrambled, but still identifies you)",
-  HashedPersonalDetail: "personal details (scrambled)",
-  PersonalDetail: "personal details",
-  UserId: "your account ID",
-  PersistentId: "an ID that recognises your device every time",
-  ClickId: "which ad you clicked",
-  PageUrl: "what you were looking at",
-  PageTitle: "the page title",
-  Referrer: "where you came from",
-  Event: "what you did",
-  Purchase: "what you bought",
-  Device: "details about your device",
-  TrackerAccount: "the app's tracker account",
-  Other: "other details",
-};
-const ORDER = Object.keys(KIND);
+import { KIND, KIND_ORDER as ORDER } from "../kinds";
 
 export default function InspectPage() {
   const [status, setStatus] = useState<ProxyStatus | null>(null);

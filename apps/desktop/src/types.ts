@@ -171,3 +171,54 @@ export interface BlockingStatus {
 }
 export interface BlockingPreview { adapters: { name: string; current: string }[] }
 export interface SystemProxyStatus { on: boolean; other_proxy: boolean; proxy_running: boolean }
+export interface ConsentSignal { source: string; summary: string; refused: boolean }
+export interface PrivacyContact { name: string; email: string | null; form: string | null; self_service: string | null; source: string; how: string | null }
+export interface CompanyActivity {
+  company: string;
+  category: string | null;
+  requests: number;
+  products: string[];
+  sources: { source: string; requests: number }[];
+  source_count: number;
+  apps: string[];
+  kinds: string[];
+  identifiers: { label: string; value: string }[];
+  cookies_set: { name: string; from: string[] }[];
+  refused_but_identified: number;
+  last_unix: number;
+  contact: PrivacyContact | null;
+}
+export interface Sighting {
+  unix: number;
+  app: string | null;
+  source: string | null;
+  host: string;
+  company: string;
+  product: string | null;
+  fields: DecodedField[];
+  consent: ConsentSignal[];
+  set_cookies: string[];
+}
+export interface SiteChoiceResult {
+  site: string;
+  refused_unix: number;
+  requests_after: number;
+  identifying_after: number;
+  companies_after: string[];
+  verdict: "ignored" | "anonymous_only" | "nothing_seen";
+}
+export interface DataRequestRecord { company: string; kind: "access" | "delete" | "object"; sent_unix: number; due_unix: number }
+export interface Requester { name: string; email: string; region: "gdpr" | "ccpa" | "other" | "" }
+export interface TrackerActivity {
+  now: number;
+  total: number;
+  watching: boolean;
+  proxy_running: boolean;
+  companies: CompanyActivity[];
+  sites: { site: string; requests: number; companies: string[] }[];
+  choices: SiteChoiceResult[];
+  recent: Sighting[];
+  requests: DataRequestRecord[];
+  requester: Requester;
+  network_only?: { process: string; tracker_lookups: number; companies: string[] }[];
+}

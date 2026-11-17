@@ -1,8 +1,20 @@
-//! Which connections are decrypted. Inspection is opt-in per app; hosts that
-//! must never be touched, and hosts an app refused to let us inspect, are
-//! always tunnelled untouched.
+//! Which connections are decrypted: every connection of an app the user
+//! picked, and (when watching is on) connections from any app to a known
+//! tracking company only. Hosts that must never be touched, and hosts an app
+//! refused to let us inspect, are always tunnelled untouched.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
+
+/// Says whether a host belongs to a tracking company.
+#[derive(Clone)]
+pub struct TrackerHosts(pub Arc<dyn Fn(&str) -> bool + Send + Sync>);
+
+impl std::fmt::Debug for TrackerHosts {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("TrackerHosts")
+    }
+}
 
 /// Never decrypted, whatever the user chose: system updates, security
 /// services and Microsoft sign-in.
@@ -26,6 +38,8 @@ pub struct Rules {
     /// Hosts whose app rejected our certificate (pinning or its own trust
     /// list). Tunnelled from then on so the app keeps working.
     learned_bypass: BTreeSet<String>,
+    /// When set, connections from any app to these hosts are decrypted.
+    trackers: Option<TrackerHosts>,
 }
 
 impl Rules {
@@ -58,7 +72,18 @@ impl Rules {
         if NEVER_INSPECT.iter().any(|d| covers(&host, d)) || self.learned_bypass.contains(&host) {
             return false;
         }
-        self.inspect_all || app.is_some_and(|a| self.apps.contains(&a.to_lowercase()))
+        self.inspect_all
+            || app.is_some_and(|a| self.apps.contains(&a.to_lowercase()))
+            || self.trackers.as_ref().is_some_and(|t| (t.0)(&host))
+    }
+
+    /// Watch what every app sends to tracking companies (`None` stops it).
+    pub fn watch_trackers(&mut self, trackers: Option<TrackerHosts>) {
+        self.trackers = trackers;
+    }
+
+    pub fn watching_trackers(&self) -> bool {
+        self.trackers.is_some()
     }
 
     pub fn learn_bypass(&mut self, host: &str) {
@@ -89,6 +114,17 @@ mod tests {
         assert!(r.should_inspect(Some("discord.exe"), "discord.com"));
         assert!(!r.should_inspect(Some("slack.exe"), "slack.com"));
         assert!(!r.should_inspect(None, "discord.com"));
+    }
+
+    #[test]
+    fn watching_trackers_decrypts_only_tracker_hosts_from_any_app() {
+        let mut r = Rules::default();
+        r.watch_trackers(Some(TrackerHosts(Arc::new(|h: &str| h.ends_with("doubleclick.net")))));
+        assert!(r.should_inspect(Some("chrome.exe"), "stats.g.doubleclick.net"));
+        assert!(r.should_inspect(None, "stats.g.doubleclick.net"));
+        assert!(!r.should_inspect(Some("chrome.exe"), "mybank.example"), "everything else is untouched");
+        r.watch_trackers(None);
+        assert!(!r.should_inspect(Some("chrome.exe"), "stats.g.doubleclick.net"));
     }
 
     #[test]

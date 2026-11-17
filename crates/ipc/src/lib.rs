@@ -87,6 +87,31 @@ pub enum Request {
         domain: String,
         allow: bool,
     },
+    /// What trackers received from this user's apps and browsers, by
+    /// company and site, with choices and data requests.
+    TrackerActivity,
+    /// Decrypt connections from every app to known tracking companies (only
+    /// those). Machine-wide; needs the certificate and proxy set up.
+    SetWatchTrackers {
+        on: bool,
+    },
+    /// The user said no to tracking on this site (`refused: false` forgets it).
+    SetSiteChoice {
+        site: String,
+        refused: bool,
+    },
+    /// The user sent (`sent: true`) or withdrew a data request.
+    SetDataRequest {
+        company: String,
+        kind: String,
+        sent: bool,
+    },
+    /// Name, email and region for data request letters.
+    SetRequester {
+        name: String,
+        email: String,
+        region: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

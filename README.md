@@ -10,6 +10,7 @@ Guardian Angel shows who is collecting data from your Windows PC, explains it in
 | **Trackers** | Companies with cookies in your browsers, plus what every other cookie is for, including tracking tools hiding under websites' own names. Delete tracking cookies while staying signed in |
 | **Apps** | Tracking and telemetry SDKs built into your desktop apps (Sentry, App Center, Mixpanel, Segment, Firebase and more) |
 | **Network** | Which programs contact which tracking companies, live |
+| **What trackers got** | What every browser and app sent to tracking companies (only connections to known trackers are read), which site or app sent it, which cookies each tracker set and where, whether sites that you said no to kept sending your ID, and ready-written data requests (access, delete, opt out) for GDPR, CCPA or elsewhere, with reply deadlines |
 | **Inspect traffic** | Exactly what an app you pick sends to trackers, decoded into plain language |
 | **Blocking** | Stops every app and browser on the PC from reaching tracking companies (three levels, pause, never-block list) |
 | **Extensions** | Browser extensions and what each one can read |
@@ -157,6 +158,7 @@ Add `--json` to most commands for machine-readable output.
 - **Blocking:** works through DNS, so browsers with Secure DNS (DNS over HTTPS) turned on skip it for websites, and apps that bring their own DNS are not covered. Changing the network setting needs the installed service. It is machine-wide: any signed-in user can turn it on or off.
 - **Windows proxy:** only apps that follow Windows' proxy setting can be inspected that way (most do; some games and command-line tools do not). Not used when another proxy (work or school) is set. VPN and dial-up connections keep their own setting.
 - **Cookie deletion:** needs the browser closed; open browsers are skipped. It cannot be undone.
+- **What trackers got:** platforms people sign in to (Google search, Facebook, LinkedIn) are never decrypted, so trackers served from their main domains (such as the Meta Pixel's `facebook.com/tr`) are not read. Apps that pin their certificates are passed through untouched and listed. Privacy contacts were checked against each company's own pages in November 2026 and cover 11 large companies; for others the letter is ready to copy.
 - **Code signing:** the installer and app are not signed yet, so Windows SmartScreen warns on first run.
 - **Testing:** tested on Windows 10 22H2. Needs Windows 11 and Home / Pro / Enterprise runs, and the installed service needs a full test as SYSTEM.
 - **Network monitor:** sees lookups through the Windows DNS client only; browsers using Secure DNS bypass it. Data volumes per program are not measured yet.

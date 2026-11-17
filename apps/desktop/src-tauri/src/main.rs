@@ -220,6 +220,24 @@ fn system_proxy_off() -> Result<(), String> {
     Ok(())
 }
 
+/// Opens a web page or a new email in the user's own browser or mail app
+/// (data request forms and letters). Only `https:` and `mailto:` links.
+#[tauri::command]
+fn open_link(url: String) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let lower = url.to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("mailto:")) || url.len() > 8000 || url.contains(['\r', '\n', '"']) {
+        return Err("Only web and email links can be opened.".into());
+    }
+    std::process::Command::new("rundll32.exe")
+        .args(["url.dll,FileProtocolHandler", &url])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
 /// Updates need the release signing key's public half in the config. Builds
 /// made without it (development, local installers) cannot update themselves.
 fn updates_configured(app: &tauri::AppHandle) -> bool {
@@ -293,7 +311,8 @@ fn main() {
             install_update,
             system_proxy_status,
             system_proxy_on,
-            system_proxy_off
+            system_proxy_off,
+            open_link
         ])
         .run(tauri::generate_context!())
         .expect("error while running Guardian Angel");

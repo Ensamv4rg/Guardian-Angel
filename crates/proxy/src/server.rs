@@ -62,8 +62,17 @@ pub fn pac_script(proxy: SocketAddr) -> String {
 /// Headers that apply to one hop only and must not be forwarded.
 const HOP_BY_HOP: &[&str] = &["proxy-connection", "keep-alive", "proxy-authorization", "te", "trailer"];
 
-/// Works out which program opened a connection: (client address, proxy address) -> exe name.
-pub type AppResolver = Arc<dyn Fn(SocketAddr, SocketAddr) -> Option<String> + Send + Sync>;
+/// The program behind a connection and the Windows account running it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppId {
+    /// Executable name, e.g. `Discord.exe`.
+    pub exe: String,
+    /// The account's SID, so each user only sees their own traffic.
+    pub user: Option<String>,
+}
+
+/// Works out which program opened a connection: (client address, proxy address) -> program.
+pub type AppResolver = Arc<dyn Fn(SocketAddr, SocketAddr) -> Option<AppId> + Send + Sync>;
 
 /// How the proxy checks the certificates of real servers.
 #[derive(Clone)]
@@ -98,6 +107,10 @@ impl ProxyConfig {
 #[derive(Debug, Clone, Serialize)]
 pub struct InspectedRequest {
     pub app: Option<String>,
+    /// The Windows account (SID) of the program; never sent to the UI.
+    #[serde(skip)]
+    pub user: Option<String>,
+    pub unix: i64,
     pub host: String,
     pub method: String,
     pub path: String,
@@ -105,11 +118,20 @@ pub struct InspectedRequest {
     pub request_bytes: usize,
     /// Decoded tracker data; empty when the request is not a known tracker format.
     pub payloads: Vec<DecodedPayload>,
+    /// For requests no decoder knows: their parameters, with IDs and
+    /// personal data picked out.
+    pub summary: Option<DecodedPayload>,
+    /// The site the request was made from (browsers send it as Referer or Origin).
+    pub source: Option<String>,
+    /// Names of cookies the server set in its answer.
+    pub set_cookies: Vec<String>,
+    /// Privacy choices carried in the request.
+    pub consent: Vec<ga_core::ConsentSignal>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub enum ProxyEvent {
-    Inspected(InspectedRequest),
+    Inspected(Box<InspectedRequest>),
     /// Passed through without decryption.
     Tunneled { app: Option<String>, host: String },
     /// The app refused our certificate; the host is now always tunnelled.
@@ -233,13 +255,14 @@ impl Shared {
         };
 
         let app = (self.app_of)(peer, proxy_addr);
-        let inspect = port == 443 && read(&self.rules).should_inspect(app.as_deref(), &host);
+        let exe = app.as_ref().map(|a| a.exe.clone());
+        let inspect = port == 443 && read(&self.rules).should_inspect(exe.as_deref(), &host);
         client.write_all(b"HTTP/1.1 200 Connection Established\r\n\r\n").await?;
 
         if inspect && leftover.is_empty() {
             self.intercept(client, app, host, port).await
         } else {
-            self.emit(ProxyEvent::Tunneled { app, host: host.clone() });
+            self.emit(ProxyEvent::Tunneled { app: exe, host: host.clone() });
             let mut upstream = self.connect(&host, port).await?;
             upstream.write_all(&leftover).await?;
             tokio::io::copy_bidirectional(&mut client, &mut upstream).await?;
@@ -270,7 +293,7 @@ impl Shared {
         Ok(config)
     }
 
-    async fn intercept(self: Arc<Self>, client: TcpStream, app: Option<String>, host: String, port: u16) -> Result<(), BoxError> {
+    async fn intercept(self: Arc<Self>, client: TcpStream, app: Option<AppId>, host: String, port: u16) -> Result<(), BoxError> {
         let acceptor = TlsAcceptor::from(self.server_config(&host)?);
         let client_tls = match tokio::time::timeout(HANDSHAKE_TIMEOUT, acceptor.accept(client)).await {
             Ok(Ok(tls)) => tls,
@@ -278,7 +301,7 @@ impl Shared {
             // trust list). Remember the host so its next attempt is tunnelled.
             _ => {
                 write(&self.rules).learn_bypass(&host);
-                self.emit(ProxyEvent::AppRejectedInspection { app, host });
+                self.emit(ProxyEvent::AppRejectedInspection { app: app.map(|a| a.exe), host });
                 return Ok(());
             }
         };
@@ -311,8 +334,19 @@ impl Shared {
 struct ConnCtx {
     shared: Arc<Shared>,
     sender: AsyncMutex<hyper::client::conn::http1::SendRequest<Body>>,
-    app: Option<String>,
+    app: Option<AppId>,
     host: String,
+}
+
+/// The site a browser request came from: the host of its Referer or Origin.
+fn source_site(headers: &hyper::HeaderMap) -> Option<String> {
+    ["referer", "origin"].iter().find_map(|h| {
+        let value = headers.get(*h)?.to_str().ok()?;
+        let rest = value.split_once("://")?.1;
+        let host = rest.split(['/', '?', '#']).next()?.rsplit_once('@').map_or(rest.split(['/', '?', '#']).next()?, |(_, h)| h);
+        let host = host.split(':').next()?.to_ascii_lowercase();
+        (!host.is_empty() && host != "null").then_some(host)
+    })
 }
 
 impl ConnCtx {
@@ -323,6 +357,9 @@ impl ConnCtx {
         let client_upgrade = upgrade.then(|| hyper::upgrade::on(&mut req));
 
         let (mut parts, body) = req.into_parts();
+        let source = source_site(&parts.headers);
+        // Global Privacy Control: the browser's "do not sell or share" switch.
+        let gpc = parts.headers.get("sec-gpc").and_then(|v| v.to_str().ok()) == Some("1");
         for h in HOP_BY_HOP {
             parts.headers.remove(*h);
         }
@@ -363,20 +400,46 @@ impl ConnCtx {
 
         let text = captured.as_ref().map(|b| String::from_utf8_lossy(b).into_owned());
         let url = format!("https://{}{}", self.host, path);
-        let payloads = ga_decoders::decode(&ga_decoders::Request {
+        let decoder_request = ga_decoders::Request {
             method: &method,
             url: &url,
             body: text.as_deref(),
-        });
-        self.shared.emit(ProxyEvent::Inspected(InspectedRequest {
-            app: self.app.clone(),
+        };
+        let payloads = ga_decoders::decode(&decoder_request);
+        let summary = if payloads.is_empty() { ga_decoders::summarize(&decoder_request) } else { None };
+        let mut consent = ga_decoders::consent_signals(&decoder_request);
+        if gpc {
+            consent.push(ga_core::ConsentSignal {
+                source: "Global Privacy Control".into(),
+                summary: "Your browser asked sites not to sell or share your data".into(),
+                refused: true,
+            });
+        }
+        // Only the names of cookies set, never their values.
+        let set_cookies: Vec<String> = response
+            .headers()
+            .get_all("set-cookie")
+            .iter()
+            .filter_map(|v| v.to_str().ok()?.split('=').next().map(|n| n.trim().to_owned()))
+            .filter(|n| !n.is_empty())
+            .collect();
+        self.shared.emit(ProxyEvent::Inspected(Box::new(InspectedRequest {
+            app: self.app.as_ref().map(|a| a.exe.clone()),
+            user: self.app.as_ref().and_then(|a| a.user.clone()),
+            unix: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs() as i64),
             host: self.host.clone(),
             method,
             path,
             status: Some(response.status().as_u16()),
             request_bytes,
             payloads,
-        }));
+            summary,
+            source,
+            set_cookies,
+            consent,
+        })));
 
         // WebSocket and other upgrades: splice the two raw connections.
         if response.status() == StatusCode::SWITCHING_PROTOCOLS

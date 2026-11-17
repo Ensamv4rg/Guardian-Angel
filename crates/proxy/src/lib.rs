@@ -15,8 +15,8 @@ pub mod rules;
 mod server;
 
 pub use ca::{CA_COMMON_NAME, CaError, CertAuthority};
-pub use rules::Rules;
-pub use server::{AppResolver, InspectedRequest, PAC_PATH, Proxy, ProxyConfig, ProxyEvent, UpstreamTrust, pac_script};
+pub use rules::{Rules, TrackerHosts};
+pub use server::{AppId, AppResolver, InspectedRequest, PAC_PATH, Proxy, ProxyConfig, ProxyEvent, UpstreamTrust, pac_script};
 
 /// Resolves which program opened a proxy connection, using Windows' TCP
 /// connection table. Returns the executable name, e.g. `Discord.exe`.
@@ -27,7 +27,10 @@ pub fn windows_app_resolver() -> AppResolver {
         let (SocketAddr::V4(client), SocketAddr::V4(proxy)) = (client, proxy) else { return None };
         let pid = ga_platform_win::tcp_connection_owner(client, proxy)?;
         let path = ga_platform_win::process_image_path(pid)?;
-        Some(path.rsplit('\\').next().unwrap_or(&path).to_owned())
+        Some(server::AppId {
+            exe: path.rsplit('\\').next().unwrap_or(&path).to_owned(),
+            user: ga_platform_win::process_user_sid(pid),
+        })
     })
 }
 

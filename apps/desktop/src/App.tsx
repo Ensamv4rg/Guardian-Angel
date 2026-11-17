@@ -10,11 +10,12 @@ import AppsPage from "./pages/Apps";
 import NetworkPage from "./pages/Network";
 import InspectPage from "./pages/Inspect";
 import BlockingPage from "./pages/Blocking";
+import ReceivedPage from "./pages/Received";
 import ExtensionsPage from "./pages/Extensions";
 import SettingsPage from "./pages/Settings";
 import AlertsPage from "./pages/Alerts";
 
-export type Page = "overview" | "trackers" | "apps" | "network" | "inspect" | "blocking" | "extensions" | "settings" | "alerts";
+export type Page = "overview" | "trackers" | "apps" | "network" | "inspect" | "received" | "blocking" | "extensions" | "settings" | "alerts";
 
 export interface PageProps {
   overview: Overview | null;
@@ -24,7 +25,7 @@ export interface PageProps {
 
 const SECTIONS: { title: string; pages: [Page, string][] }[] = [
   { title: "", pages: [["overview", "Overview"]] },
-  { title: "Who collects data", pages: [["trackers", "Trackers"], ["apps", "Apps"], ["network", "Network"], ["inspect", "Inspect traffic"]] },
+  { title: "Who collects data", pages: [["trackers", "Trackers"], ["apps", "Apps"], ["network", "Network"], ["received", "What trackers got"], ["inspect", "Inspect traffic"]] },
   { title: "Protect", pages: [["blocking", "Blocking"]] },
   { title: "Your setup", pages: [["extensions", "Extensions"], ["settings", "Windows settings"], ["alerts", "Alerts"]] },
 ];
@@ -59,6 +60,7 @@ export default function App() {
     apps: <AppsPage {...props} />,
     network: <NetworkPage {...props} />,
     inspect: <InspectPage />,
+    received: <ReceivedPage {...props} />,
     blocking: <BlockingPage />,
     extensions: <ExtensionsPage {...props} />,
     settings: <SettingsPage {...props} />,

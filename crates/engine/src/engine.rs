@@ -43,6 +43,7 @@ pub struct Engine {
     network: Mutex<NetworkState>,
     proxy: ProxyState,
     blocking: Arc<crate::blocking::Blocking>,
+    watch: Arc<crate::watch::Watch>,
 }
 
 enum NetworkState {
@@ -52,6 +53,9 @@ enum NetworkState {
 }
 
 struct ProxyState {
+    /// Decrypt any app's connections to trackers (persisted; on by default).
+    watch_trackers: Mutex<bool>,
+    tracker_hosts: ga_proxy::TrackerHosts,
     listening: Option<SocketAddr>,
     error: Option<String>,
     ca: Option<Arc<CertAuthority>>,
@@ -105,7 +109,8 @@ impl Engine {
             NetworkState::Off
         };
 
-        let proxy = start_proxy(&config).await;
+        let watch = crate::watch::Watch::new(&config.data_root, db.clone());
+        let proxy = start_proxy(&config, db.clone(), watch.clone()).await;
         let blocking = crate::blocking::Blocking::load(&config.data_root, db.clone());
         if config.dns_blocking {
             blocking.resume_after_start().await;
@@ -128,7 +133,14 @@ impl Engine {
             network: Mutex::new(network),
             proxy,
             blocking,
+            watch,
         })
+    }
+
+    fn set_watch_trackers(&self, on: bool) {
+        *lock(&self.proxy.watch_trackers) = on;
+        write(&self.proxy.rules).watch_trackers(on.then(|| self.proxy.tracker_hosts.clone()));
+        save_json(&self.config.data_root.join("watch_trackers.json"), &json!({ "on": on }));
     }
 
     /// The service is stopping: put Windows' network settings back (blocking
@@ -272,16 +284,65 @@ impl Engine {
             }
             Request::ProxyStatus => Ok(self.proxy_status()),
             Request::ProxySetApps { apps } => {
+                let watching = *lock(&self.proxy.watch_trackers);
                 let mut rules = write(&self.proxy.rules);
                 let bypassed: Vec<String> = rules.bypassed_hosts().map(str::to_owned).collect();
                 *rules = Rules::for_apps(apps.iter().map(String::as_str));
                 bypassed.iter().for_each(|h| rules.learn_bypass(h));
+                rules.watch_trackers(watching.then(|| self.proxy.tracker_hosts.clone()));
                 drop(rules);
                 Ok(self.proxy_status())
             }
             Request::ProxyEvents => {
-                let events: Vec<InspectedRequest> = lock(&self.proxy.events).iter().rev().cloned().collect();
+                // Only this user's programs.
+                let events: Vec<InspectedRequest> = lock(&self.proxy.events)
+                    .iter()
+                    .rev()
+                    .filter(|e| e.user.is_some() && e.user == slot.ctx.sid)
+                    .cloned()
+                    .collect();
                 Ok(json!(events))
+            }
+            Request::TrackerActivity => {
+                let mut report = self.watch.report(&slot.ctx.key, unix_now());
+                report["watching"] = json!(*lock(&self.proxy.watch_trackers));
+                report["proxy_running"] = json!(self.proxy.listening.is_some());
+                // Apps whose tracker contacts were seen on the network but not
+                // read (they do not use the proxy): names only.
+                if let NetworkState::Running(m) = &*lock(&self.network) {
+                    let net = ga_report::build_network_report(&m.snapshot(), &self.db);
+                    report["network_only"] = json!(net.processes.iter().filter(|p| p.tracker_lookups > 0).collect::<Vec<_>>());
+                }
+                Ok(report)
+            }
+            Request::SetWatchTrackers { on } => {
+                self.set_watch_trackers(on);
+                Ok(self.proxy_status())
+            }
+            Request::SetSiteChoice { site, refused } => {
+                if crate::watch::site_name(&site).is_empty() {
+                    return Err("Enter a site, for example news.example".into());
+                }
+                self.watch.set_choice(&slot.ctx.key, &site, refused, unix_now());
+                Ok(Value::Null)
+            }
+            Request::SetDataRequest { company, kind, sent } => {
+                if !matches!(kind.as_str(), "access" | "delete" | "object") {
+                    return Err(format!("unknown request kind '{kind}'"));
+                }
+                if sent {
+                    self.watch.request_sent(&slot.ctx.key, &company, &kind, unix_now());
+                } else {
+                    self.watch.request_removed(&slot.ctx.key, &company, &kind);
+                }
+                Ok(Value::Null)
+            }
+            Request::SetRequester { name, email, region } => {
+                if !matches!(region.as_str(), "gdpr" | "ccpa" | "other") {
+                    return Err(format!("unknown region '{region}'"));
+                }
+                self.watch.set_requester(&slot.ctx.key, crate::watch::Requester { name, email, region });
+                Ok(Value::Null)
             }
             Request::RunningApps => Ok(self.running_apps(&slot.ctx)),
             Request::DeleteTrackerCookies { include_social, site_trackers } => {
@@ -344,6 +405,7 @@ impl Engine {
         let rules = read(&self.proxy.rules);
         json!({
             "listening": self.proxy.listening,
+            "watching_trackers": *lock(&self.proxy.watch_trackers),
             "error": self.proxy.error,
             "inspected_apps": rules.apps().collect::<Vec<_>>(),
             "refused_inspection": rules.bypassed_hosts().collect::<Vec<_>>(),
@@ -641,10 +703,23 @@ fn add_alerts(state: &mut UserState, changes: Vec<alerts::Change>) {
     state.alerts.drain(..excess);
 }
 
-async fn start_proxy(config: &EngineConfig) -> ProxyState {
-    let rules = Arc::new(RwLock::new(Rules::default()));
+async fn start_proxy(config: &EngineConfig, db: Arc<TrackerDb>, watch: Arc<crate::watch::Watch>) -> ProxyState {
+    // Only tracking companies: never platforms people sign in to (Google
+    // search, Facebook) or anything else.
+    let tracker_hosts = ga_proxy::TrackerHosts(Arc::new(move |host: &str| {
+        db.classify(host)
+            .is_some_and(|m| !matches!(m.category, ga_core::Category::Platform | ga_core::Category::Social))
+    }));
+    let watching = read_json::<Value>(&config.data_root.join("watch_trackers.json"))
+        .and_then(|v| v["on"].as_bool())
+        .unwrap_or(true);
+    let mut initial = Rules::default();
+    initial.watch_trackers(watching.then(|| tracker_hosts.clone()));
+    let rules = Arc::new(RwLock::new(initial));
     let events: Arc<Mutex<VecDeque<InspectedRequest>>> = Arc::default();
     let mut state = ProxyState {
+        watch_trackers: Mutex::new(watching),
+        tracker_hosts,
         listening: None,
         error: None,
         ca: None,
@@ -668,8 +743,9 @@ async fn start_proxy(config: &EngineConfig) -> ProxyState {
             tokio::spawn(async move {
                 while let Some(event) = rx.recv().await {
                     if let ProxyEvent::Inspected(r) = event {
+                        watch.record(&r);
                         let mut q = lock(&events);
-                        q.push_back(r);
+                        q.push_back(*r);
                         while q.len() > MAX_PROXY_EVENTS {
                             q.pop_front();
                         }

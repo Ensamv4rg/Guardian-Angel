@@ -6,7 +6,7 @@
 
 use std::path::Path;
 
-const FILES: &[&str] = &["seed_trackers.json", "ddg_trackers.json", "sdk_signatures.json"];
+const FILES: &[&str] = &["seed_trackers.json", "ddg_trackers.json", "sdk_signatures.json", "privacy_contacts.json"];
 
 fn main() {
     let sources = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/sources");

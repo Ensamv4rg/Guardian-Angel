@@ -34,6 +34,39 @@ fn bundled_ddg() -> &'static str {
     packed!("ddg_trackers.json")
 }
 
+/// Where to send data requests to tracking companies (`privacy_contacts.json`).
+pub fn bundled_privacy_contacts() -> &'static str {
+    packed!("privacy_contacts.json")
+}
+
+/// One company's privacy request channel.
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
+pub struct PrivacyContact {
+    pub name: String,
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    pub email: Option<String>,
+    pub form: Option<String>,
+    pub self_service: Option<String>,
+    /// The company's own page these details come from.
+    pub source: String,
+    pub how: Option<String>,
+}
+
+/// The contact for a company, matched by name or alias (any case).
+pub fn privacy_contact(company: &str) -> Option<PrivacyContact> {
+    #[derive(Deserialize)]
+    struct File {
+        companies: Vec<PrivacyContact>,
+    }
+    static ALL: std::sync::LazyLock<Vec<PrivacyContact>> = std::sync::LazyLock::new(|| {
+        serde_json::from_str::<File>(bundled_privacy_contacts()).map(|f| f.companies).unwrap_or_default()
+    });
+    ALL.iter()
+        .find(|c| c.name.eq_ignore_ascii_case(company) || c.aliases.iter().any(|a| a.eq_ignore_ascii_case(company)))
+        .cloned()
+}
+
 /// Signatures of tracking SDKs (files, packages, addresses) for the app scanner.
 pub fn bundled_sdk_catalog() -> &'static str {
     packed!("sdk_signatures.json")
@@ -207,6 +240,18 @@ mod tests {
             TrackerDb::from_json(json),
             Err(KnowledgeError::DuplicateDomain { .. })
         ));
+    }
+
+    #[test]
+    fn privacy_contacts_load_and_match_aliases() {
+        let google = privacy_contact("google ads").expect("alias matches");
+        assert_eq!(google.name, "Google");
+        assert!(google.form.is_some() && google.email.is_none());
+        assert_eq!(privacy_contact("Criteo").and_then(|c| c.email).as_deref(), Some("dpo@criteo.com"));
+        assert!(privacy_contact("Nobody Inc").is_none());
+        // Every company the tracker list names exactly matches at most one contact.
+        let db = TrackerDb::bundled().unwrap();
+        assert!(db.entries().any(|(_, c, _)| privacy_contact(c).is_some()), "contacts use tracker-list names");
     }
 
     #[test]

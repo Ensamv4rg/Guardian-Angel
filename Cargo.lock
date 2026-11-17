@@ -1213,6 +1213,7 @@ version = "0.1.0"
 dependencies = [
  "ga-blocker",
  "ga-core",
+ "ga-decoders",
  "ga-ipc",
  "ga-knowledge",
  "ga-netmon",

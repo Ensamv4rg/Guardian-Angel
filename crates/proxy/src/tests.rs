@@ -85,7 +85,9 @@ async fn fake_upstream() -> FakeUpstream {
                         let line = format!("{} {}", req.method(), req.uri());
                         let body = req.into_body().collect().await?.to_bytes();
                         seen.lock().unwrap().push(format!("{line} {}", String::from_utf8_lossy(&body)));
-                        Ok(Response::new(Full::new(Bytes::from_static(b"upstream-ok"))))
+                        let mut r = Response::new(Full::new(Bytes::from_static(b"upstream-ok")));
+                        r.headers_mut().insert("set-cookie", "uid=secret-value; Path=/; Secure".parse().unwrap());
+                        Ok(r)
                     }
                 });
                 let _ = hyper::server::conn::http1::Builder::new()
@@ -126,7 +128,7 @@ async fn start_proxy(up: &FakeUpstream, rules: Rules, app: &'static str) -> Runn
     };
     let rules = Arc::new(RwLock::new(rules));
     let (tx, events) = mpsc::channel(64);
-    let proxy = Proxy::bind(config, ca.clone(), rules.clone(), tx, Arc::new(move |_, _| Some(app.to_owned())))
+    let proxy = Proxy::bind(config, ca.clone(), rules.clone(), tx, Arc::new(move |_, _| Some(crate::AppId { exe: app.to_owned(), user: None })))
         .await
         .unwrap();
     let addr = proxy.local_addr().unwrap();
@@ -204,6 +206,33 @@ async fn decrypts_forwards_and_decodes_opted_in_apps() {
     assert_eq!(r.payloads.len(), 1);
     assert_eq!(r.payloads[0].product, "Google Analytics 4");
     assert!(r.payloads[0].kinds().contains(&DataKind::PersistentId));
+}
+
+#[tokio::test]
+async fn records_the_source_site_cookie_names_and_consent_but_never_cookie_values() {
+    let up = fake_upstream().await;
+    let mut rules = Rules::default();
+    rules.watch_trackers(Some(crate::TrackerHosts(Arc::new(|h: &str| h == HOST))));
+    let mut p = start_proxy(&up, rules, "chrome.exe").await;
+
+    let tls = connect(p.addr, p.ca.cert_der()).await.expect("browser trusts our CA");
+    let req = Request::get("/px?gcs=G100&visitor_id=8f2b4c6d9e1a3b5c7d")
+        .header("host", HOST)
+        .header("referer", "https://news.example:443/article/1?x=y")
+        .header("sec-gpc", "1")
+        .body(Full::new(Bytes::new()))
+        .unwrap();
+    let (status, _) = send(tls, req).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let ProxyEvent::Inspected(r) = next_event(&mut p.events).await else { panic!("expected inspection") };
+    assert_eq!(r.source.as_deref(), Some("news.example"));
+    assert_eq!(r.set_cookies, ["uid"]);
+    assert!(!format!("{r:?}").contains("secret-value"), "cookie values are never kept");
+    assert!(r.consent.iter().any(|c| c.source == "Google Consent Mode" && c.refused));
+    assert!(r.consent.iter().any(|c| c.source == "Global Privacy Control"));
+    let summary = r.summary.expect("unknown format is summarised");
+    assert!(summary.fields.iter().any(|f| f.key == "visitor_id" && f.kind == DataKind::PersistentId));
 }
 
 #[tokio::test]

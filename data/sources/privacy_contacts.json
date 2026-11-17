@@ -1,0 +1,79 @@
+{
+  "note": "Where to send data requests. Checked against each company's own privacy pages in November 2026. Companies change these; the app always shows the source page so the user can check. Stored compressed in the programs (see crates/knowledge/build.rs).",
+  "companies": [
+    {
+      "name": "Google",
+      "aliases": ["Google LLC", "Google Ads", "Google Analytics", "DoubleClick", "YouTube"],
+      "form": "https://support.google.com/policies/contact/general_privacy_form",
+      "self_service": "https://takeout.google.com",
+      "source": "https://support.google.com/policies/answer/9581826",
+      "how": "Google only accepts requests through its form, signed in to your Google account. Download your own data first with Google Takeout."
+    },
+    {
+      "name": "Meta",
+      "aliases": ["Facebook", "Facebook, Inc.", "Meta Platforms", "Instagram"],
+      "form": "https://www.facebook.com/privacy/center/",
+      "source": "https://www.facebook.com/privacy/center/",
+      "how": "In Meta's Privacy Center choose \"Your information and Meta\" and follow the steps."
+    },
+    {
+      "name": "Microsoft",
+      "aliases": ["Microsoft Corporation", "Bing", "Microsoft Advertising", "Microsoft Clarity", "Xandr"],
+      "form": "https://aka.ms/privacyresponse",
+      "source": "https://www.microsoft.com/privacy/privacy-support-requests",
+      "how": "Microsoft's privacy request form (it reaches its Data Protection Officer). Answers within 30 days."
+    },
+    {
+      "name": "Criteo",
+      "aliases": ["Criteo SA"],
+      "email": "dpo@criteo.com",
+      "source": "https://criteo.com/privacy/your-rights"
+    },
+    {
+      "name": "Outbrain",
+      "aliases": ["Outbrain, Inc.", "Teads"],
+      "email": "privacy@outbrain.com",
+      "source": "https://www.outbrain.com/privacy/"
+    },
+    {
+      "name": "Taboola",
+      "aliases": ["Taboola, Inc."],
+      "form": "https://ccparequest.taboola.com/",
+      "source": "https://policies.taboola.com/",
+      "how": "Taboola's request portal."
+    },
+    {
+      "name": "The Trade Desk",
+      "aliases": ["The Trade Desk, Inc.", "Adsrvr"],
+      "form": "https://www.thetradedesk.com/website-privacy-policy",
+      "source": "https://www.thetradedesk.com/website-privacy-policy",
+      "how": "The privacy policy links the request form; The Trade Desk then asks you to verify your identity."
+    },
+    {
+      "name": "PubMatic",
+      "aliases": ["PubMatic, Inc."],
+      "email": "dpo@pubmatic.com",
+      "source": "https://pubmatic.com/legal/dsr-notice"
+    },
+    {
+      "name": "Magnite",
+      "aliases": ["Magnite Inc", "Rubicon Project", "Telaria", "SpringServe"],
+      "email": "privacy@magnite.com",
+      "form": "https://www.magnite.com/legal/user-choice-portal/",
+      "source": "https://www.magnite.com/legal/user-choice-portal/"
+    },
+    {
+      "name": "Quantcast",
+      "aliases": ["Quantcast International"],
+      "form": "https://www.quantcast.com/privacy-choices/",
+      "source": "https://help.quantcast.com/docs/faqs-data-subject-rights",
+      "how": "Quantcast's Privacy Choices page handles access, deletion and opt-out requests."
+    },
+    {
+      "name": "Hotjar",
+      "aliases": ["Contentsquare"],
+      "email": "dpo@hotjar.com",
+      "source": "https://help.hotjar.com/hc/en-us/articles/36819957072145-Compliance-FAQs"
+    }
+  ]
+}

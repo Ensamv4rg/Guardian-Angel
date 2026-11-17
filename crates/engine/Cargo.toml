@@ -24,6 +24,7 @@ ga-netmon.workspace = true
 ga-platform-win.workspace = true
 
 [dev-dependencies]
+ga-decoders.workspace = true
 tempfile.workspace = true
 
 [lints]

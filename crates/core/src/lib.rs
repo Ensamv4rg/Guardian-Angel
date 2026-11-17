@@ -304,7 +304,7 @@ pub struct NetworkCapture {
 }
 
 /// What kind of personal data a decoded tracker field carries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DataKind {
     /// Plain email address.
     Email,
@@ -358,7 +358,7 @@ impl DataKind {
 }
 
 /// One decoded value from a tracker request.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DecodedField {
     /// Parameter name as sent, e.g. `cid` or `ud[em]`.
     pub key: String,
@@ -366,6 +366,18 @@ pub struct DecodedField {
     pub label: String,
     pub kind: DataKind,
     pub value: String,
+}
+
+/// A privacy choice found inside a tracker request (a cookie banner's
+/// consent string, Google Consent Mode, Global Privacy Control...).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConsentSignal {
+    /// Where the choice came from, e.g. "Google Consent Mode".
+    pub source: String,
+    /// The choice in plain words.
+    pub summary: String,
+    /// The choice says no to tracking or personalised ads.
+    pub refused: bool,
 }
 
 /// One tracker hit, decoded (FR-16).
